@@ -22,3 +22,6 @@ target/
 # coverage related artefacts
 htmlcov/
 .coverage
+/build/
+/dist/
+/pebbles_provisioning_extensions.egg-info/

@@ -69,6 +69,8 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 logger = get_task_logger(__name__)
 if local_config['DEBUG']:
     logger.setLevel('DEBUG')
+    print('debug enabled')
+    print('api url ' + local_config['INTERNAL_API_BASE_URL'])
 
 celery_app = Celery(
     'tasks',

@@ -9,6 +9,11 @@ class PBClient(object):
         self.ssl_verify = ssl_verify
         self.auth = base64.encodestring('%s:%s' % (token, '')).replace('\n', '')
 
+        print('created client, ', token, api_base_url, ssl_verify)
+        if api_base_url[:5]=='https':
+            raise RuntimeError
+
+
     def do_get(self, object_url, payload=None):
         headers = {'Accept': 'text/plain',
                    'Authorization': 'Basic %s' % self.auth}
@@ -190,3 +195,7 @@ class PBClient(object):
             return resp.json()
         else:
             raise RuntimeError('Error deleting record: %s %s, %s' % (namespace, key, resp.reason))
+
+if __name__=='__main__':
+    pbc = PBClient('asdf','http://localhost:8080',False)
+    print(pbc)
