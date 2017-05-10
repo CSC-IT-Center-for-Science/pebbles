@@ -104,7 +104,7 @@ class BaseConfig(object):
     )
     MESSAGE_QUEUE_URI = 'redis://redis:6379/0'
     INSTANCE_DATA_DIR = '/var/spool/pb_instances'
-    INTERNAL_API_BASE_URL = 'https://api:1443/api/v1'
+    INTERNAL_API_BASE_URL = 'http://api:8080/api/v1'
     PUBLIC_IPV4 = (
         '127.0.0.1',
         'used by Docker Driver to create access urls'

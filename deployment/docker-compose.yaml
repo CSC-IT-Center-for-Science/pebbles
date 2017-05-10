@@ -1,0 +1,82 @@
+version: '2.1'
+services:
+  redis:
+    image: redis
+
+  db:
+    image: centos/postgresql-95-centos7
+    environment:
+    - POSTGRESQL_USER=pebbles
+    - POSTGRESQL_PASSWORD=pebbles
+    - POSTGRESQL_DATABASE=pebbles
+
+  api:
+    image: cscfi/pebbles:latest
+    links:
+    - db
+    - redis
+    depends_on:
+    - db
+    - redis
+    ports:
+    - '8080:8080'
+    environment:
+    - PB_DEBUG=1
+    - APP_MODULE=pebbles.server:app
+    - PB_SQLALCHEMY_DATABASE_URI=postgresql://pebbles:pebbles@db/pebbles
+    - DB_AUTOMIGRATION=1
+#    - WEB_CONCURRENCY=1
+    - FLASK_DEBUG=1
+    - PB_SECRET_KEY=do_not_use_me_in_production
+    - PB_INTERNAL_API_BASE_URL=http://api:8080/api/v1
+
+  worker:
+    image: cscfi/pebbles:latest
+    links:
+    - redis
+    - api
+    environment:
+    - APP_SCRIPT=/opt/app-root/src/deployment/run_celery.bash
+    - CELERY_PROCESS_NAME=worker
+    - CELERY_QUEUE=provisioning_tasks-1
+    - CELERY_LOGLEVEL=DEBUG
+    - PB_INTERNAL_API_BASE_URL=http://api:8080/api/v1
+    - PB_SSL_VERIFY=0
+    - PB_SECRET_KEY=do_not_use_me_in_production
+    - PB_DEBUG=1
+    volumes:
+    - ..:/opt/app-root/src
+    - /var/run/tourunen/osop_m2m_creds.txt:/var/run/pebbles_m2m
+
+  system-worker:
+    image: cscfi/pebbles:latest
+    links:
+    - redis
+    - api
+    environment:
+    - PB_DEBUG=True
+    - APP_SCRIPT=/opt/app-root/src/deployment/run_celery.bash
+    - CELERY_PROCESS_NAME=system_worker
+    - CELERY_QUEUE=system_tasks
+    - CELERY_LOGLEVEL=DEBUG
+    - PB_INTERNAL_API_BASE_URL=http://api:8080/api/v1
+    - PB_SSL_VERIFY=0
+    - PB_SECRET_KEY=do_not_use_me_in_production
+    volumes:
+    - ..:/opt/app-root/src
+    - /var/run/tourunen/osop_m2m_creds.txt:/var/run/pebbles_m2m
+
+  periodical-worker:
+    image: cscfi/pebbles:latest
+    links:
+    - redis
+    - api
+    environment:
+    - APP_SCRIPT=/opt/app-root/src/deployment/run_celery.bash
+    - CELERY_CMD=beat
+    - CELERY_PROCESS_NAME=system_worker
+    - CELERY_QUEUE=system
+    - CELERY_LOGLEVEL=DEBUG
+
+  frontend:
+    image: cscfi/pebbles-frontend
