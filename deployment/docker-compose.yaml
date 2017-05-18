@@ -43,7 +43,7 @@ services:
     volumes:
     - /var/run/pebbles/osop_m2m_creds.txt:/var/run/pebbles_m2m
 # Uncomment to mount the source directory for local development
-    - ..:/opt/app-root/src:ro
+#    - ..:/opt/app-root/src:ro
 
   system-worker:
     image: cscfi/pebbles:latest

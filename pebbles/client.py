@@ -162,8 +162,3 @@ class PBClient(object):
             return resp.json()
         else:
             raise RuntimeError('Error deleting record: %s %s, %s' % (namespace, key, resp.reason))
-
-
-if __name__ == '__main__':
-    pbc = PBClient('asdf', 'http://localhost:8080', False)
-    print(pbc)
