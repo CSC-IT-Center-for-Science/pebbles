@@ -26,4 +26,4 @@ htmlcov/
 # package installation directories
 build/
 dist/
-pebbles_provisioning_extensions.egg-info/
+pebbles-4.0.0.dev1-py2.7.egg-info/
