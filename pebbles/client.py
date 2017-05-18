@@ -9,8 +9,6 @@ class PBClient(object):
         self.ssl_verify = ssl_verify
         self.auth = pebbles.utils.b64encode_string('%s:%s' % (token, '')).replace('\n', '')
 
-        print('created client, ', token, api_base_url, ssl_verify)
-
     def do_get(self, object_url, payload=None):
         headers = {'Accept': 'text/plain',
                    'Authorization': 'Basic %s' % self.auth}
