@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='pebbles-provisioning_extensions',
+    name='pebbles',
     version='1.0',
 
     description='Provisioning extensions for Pebbles',
