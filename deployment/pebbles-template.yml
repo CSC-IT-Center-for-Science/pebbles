@@ -112,7 +112,7 @@ objects:
     selector:
       name: ${NAME}-api
     strategy:
-      type: Recreate
+      type: Rolling
     template:
       metadata:
         labels:
@@ -142,6 +142,12 @@ objects:
                 name: ${NAME}
                 key: pb-secret-key
           image: ' '
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 3
+            timeoutSeconds: 3
           livenessProbe:
             httpGet:
               path: /
@@ -150,12 +156,6 @@ objects:
             timeoutSeconds: 3
           ports:
           - containerPort: 8080
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 8080
-            initialDelaySeconds: 3
-            timeoutSeconds: 3
           resources:
             limits:
               memory: ${MEMORY_LIMIT}
@@ -182,7 +182,7 @@ objects:
     selector:
       name: ${NAME}-worker
     strategy:
-      type: Recreate
+      type: Rolling
     template:
       metadata:
         labels:
@@ -535,7 +535,7 @@ parameters:
   displayName: Volume Capacity
   name: VOLUME_CAPACITY
   required: true
-  value: 1Gi
+  value: 2Gi
 - description: The URL of the repository with your application source code.
   displayName: Git Repository URL
   name: SOURCE_REPOSITORY_URL
