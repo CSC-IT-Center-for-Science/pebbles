@@ -157,8 +157,10 @@ objects:
           ports:
           - containerPort: 8080
           resources:
+            requests:
+              memory: ${MEMORY_API}
             limits:
-              memory: ${MEMORY_LIMIT}
+              memory: ${MEMORY_API}
     triggers:
     - imageChangeParams:
         automatic: true
@@ -209,8 +211,10 @@ objects:
                 key: pb-secret-key
           image: ' '
           resources:
+            requests:
+              memory: ${MEMORY_WORKER}
             limits:
-              memory: ${MEMORY_LIMIT}
+              memory: ${MEMORY_WORKER}
     triggers:
     - imageChangeParams:
         automatic: true
@@ -261,8 +265,10 @@ objects:
                 key: pb-secret-key
           image: ' '
           resources:
+            requests:
+              memory: ${MEMORY_WORKER}
             limits:
-              memory: ${MEMORY_LIMIT}
+              memory: ${MEMORY_WORKER}
     triggers:
     - imageChangeParams:
         automatic: true
@@ -315,8 +321,10 @@ objects:
                 key: pb-secret-key
           image: ' '
           resources:
+            requests:
+              memory: ${MEMORY_WORKER}
             limits:
-              memory: ${MEMORY_LIMIT}
+              memory: ${MEMORY_WORKER}
     triggers:
     - imageChangeParams:
         automatic: true
@@ -406,8 +414,10 @@ objects:
             initialDelaySeconds: 5
             timeoutSeconds: 1
           resources:
+            requests:
+              memory: ${MEMORY_POSTGRESQL}
             limits:
-              memory: ${MEMORY_POSTGRESQL_LIMIT}
+              memory: ${MEMORY_POSTGRESQL}
           volumeMounts:
           - mountPath: /var/lib/pgsql/data
             name: ${DATABASE_SERVICE_NAME}-data
@@ -486,8 +496,10 @@ objects:
             initialDelaySeconds: 5
             timeoutSeconds: 1
           resources:
+            requests:
+              memory: 100Mi
             limits:
-              memory: 200Mi
+              memory: 100Mi
           terminationMessagePath: /dev/termination-log
           volumeMounts:
           - mountPath: /var/lib/redis/data
@@ -516,71 +528,93 @@ parameters:
   name: NAME
   required: true
   value: pebbles
+
 - description: The OpenShift Namespace where the build image ImageStream resides.
   displayName: Build Image Namespace
   name: BUILD_IMAGE_NAMESPACE
   required: true
   value: openshift
-- description: Maximum amount of memory the Flask container can use.
-  displayName: Memory Limit
-  name: MEMORY_LIMIT
+
+- description: Memory for API container
+  displayName: Memory (API)
+  name: MEMORY_API
   required: true
-  value: 512Mi
-- description: Maximum amount of memory the PostgreSQL container can use.
-  displayName: Memory Limit (PostgreSQL)
-  name: MEMORY_POSTGRESQL_LIMIT
+  value: 200Mi
+
+- description: Memory for worker containers
+  displayName: Memory (workers)
+  name: MEMORY_WORKER
   required: true
-  value: 512Mi
-- description: Volume space available for data, e.g. 512Mi, 2Gi
-  displayName: Volume Capacity
-  name: VOLUME_CAPACITY
-  required: true
-  value: 2Gi
+  value: 200Mi
+
 - description: The URL of the repository with your application source code.
   displayName: Git Repository URL
   name: SOURCE_REPOSITORY_URL
   required: true
   value: https://github.com/CSCfi/pebbles
+
 - description: Set this to a branch name, tag or other ref of your repository if you
     are not using the default branch.
   displayName: Git Reference
   name: SOURCE_REPOSITORY_REF
+
 - description: Set this to the relative path to your project if it is not in the root
     of your repository.
   displayName: Context Directory
   name: CONTEXT_DIR
+
 - description: The exposed hostname that will route to the Flask service, if left
     blank a value will be defaulted.
   displayName: Application Hostname
   name: APPLICATION_DOMAIN
+
 - description: Github trigger secret.  A difficult to guess string encoded as part
     of the webhook URL.  Not encrypted.
   displayName: GitHub Webhook Secret
   from: '[a-zA-Z0-9]{40}'
   generate: expression
   name: GITHUB_WEBHOOK_SECRET
+
 - displayName: Database Service Name
   name: DATABASE_SERVICE_NAME
   required: true
   value: postgresql
+
 - displayName: Database Name
   name: DATABASE_NAME
   required: true
   value: pebbles
+
 - displayName: Database Username
   name: DATABASE_USER
   required: true
   value: pebbles
+
 - displayName: Database User Password
   from: '[a-zA-Z0-9]{16}'
   value: pebbles
   name: DATABASE_PASSWORD
+
+- description: Memory for PostgreSQL container
+  displayName: Memory (PostgreSQL)
+  name: MEMORY_POSTGRESQL
+  required: true
+  value: 200Mi
+
+- description: Volume space available for data, e.g. 512Mi, 2Gi
+  displayName: Volume Capacity
+  name: VOLUME_CAPACITY
+  required: true
+  value: 2Gi
+
 - description: Relative path to Gunicorn configuration file (optional).
   displayName: Application Configuration File Path
   name: APP_CONFIG
+
 - description: The custom PyPi index URL
   displayName: Custom PyPi Index URL
   name: PIP_INDEX_URL
+
 - description: Secret master key
   displayName: Secret master key
   from: '[a-zA-Z0-9]{40}'
