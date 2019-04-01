@@ -25,7 +25,7 @@ class OpenShiftTemplateDriver(OpenShiftDriver):
         config = CONFIG.copy()
         return config
 
-    def _spawn_project_and_objects(self, oc, project_name, blueprint_config, instance=None, environment_vars=None):
+    def _spawn_project_and_objects(self, oc, project_name, blueprint_config, instance, environment_vars=None):
         """ Create openshift objects from given template
         """
         self._create_project(oc, project_name)
@@ -47,7 +47,10 @@ class OpenShiftTemplateDriver(OpenShiftDriver):
             template_params = template_yaml['parameters']
             for template_param in template_params:
                 if(template_param['name'] in environment_vars):  # check if the user has passed env vars from the blueprint
-                    template_param['value'] = environment_vars[template_param['name']]
+                    if(template_param['value'] == "instance_name"):
+                        template_param['value'] = instance['name']
+                    else:
+                        template_param['value'] = environment_vars[template_param['name']]
 
         template_json = json.dumps(template_yaml)  # rest api requires json str
         template_objects_resp = oc.make_request(api_type='template_oapi', namespace=project_name, object_kind='processedtemplates', data=template_json)
