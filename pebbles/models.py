@@ -250,7 +250,7 @@ class Grant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     user_id = db.Column(
-        db.Integer, db.ForeignKey('users.id', ondelete='CASCADE')
+        db.String, db.ForeignKey('users.id', ondelete='CASCADE')
     )
     user = db.relationship('User')
 
@@ -288,7 +288,7 @@ class Token(db.Model):
     client = db.relationship('Client')
 
     user_id = db.Column(
-        db.Integer, db.ForeignKey('users.id')
+        db.String, db.ForeignKey('users.id')
     )
     user = db.relationship('User')
 
