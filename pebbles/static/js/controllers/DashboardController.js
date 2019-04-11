@@ -31,6 +31,11 @@ app.controller('DashboardController', ['$q', '$scope', '$routeParams', '$timeout
 
         var group_join = Restangular.all('groups').one('group_join');
 
+        var clients = Restangular.one('clients')
+        clients.get().then(function (response) {
+            console.log(response)
+        });
+
         var blueprints = Restangular.all('blueprints');
         blueprints.getList().then(function (response) {
             if($routeParams.blueprint_id){  // Case when the blueprint link is given

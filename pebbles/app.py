@@ -5,11 +5,16 @@ from flask import Flask
 from flask_migrate import upgrade as flask_upgrade_db_to_head
 from flask_migrate import Migrate
 
-from pebbles.models import db, bcrypt
+from pebbles.models import db, bcrypt, Client, Grant, Token, User
 from pebbles.config import BaseConfig, TestConfig
+
+from flask_oauthlib.provider import OAuth2Provider
+from datetime import datetime, timedelta
 
 app = Flask(__name__, static_url_path='')
 migrate = Migrate(app, db)
+
+oauth = OAuth2Provider(app)
 
 
 # Setup static files to be served by Flask for automated testing
@@ -21,6 +26,68 @@ def root():
 @app.route('/favicon.ico')
 def favicon():
     return app.send_static_file('favicon.ico')
+
+
+@app.route('/api/oauth/token')
+@oauth.token_handler
+def access_token():
+    return None
+
+
+@oauth.clientgetter
+def load_client(client_id):
+    return Client.query.filter_by(client_id=client_id).first()
+
+
+@oauth.grantgetter
+def load_grant(client_id, code):
+    return Grant.query.filter_by(client_id=client_id, code=code).first()
+
+
+@oauth.grantsetter
+def save_grant(client_id, code, request, *args, **kwargs):
+    # decide the expires time yourself
+    expires = datetime.utcnow() + timedelta(seconds=100)
+    grant = Grant(
+        client_id=client_id,
+        code=code['code'],
+        redirect_uri=request.redirect_uri,
+        _scopes=' '.join(request.scopes),
+        user=User.query.filter_by(email='a@a.com').first(),
+        expires=expires
+    )
+    db.session.add(grant)
+    db.session.commit()
+    return grant
+
+
+@oauth.tokengetter
+def load_token(access_token=None, refresh_token=None):
+    if access_token:
+        return Token.query.filter_by(access_token=access_token).first()
+    elif refresh_token:
+        return Token.query.filter_by(refresh_token=refresh_token).first()
+
+
+@oauth.tokensetter
+def save_token(token, request, *args, **kwargs):
+    toks = Token.query.filter_by(
+        client_id=request.client.client_id,
+        user_id=request.user.id
+    ).all()
+    # make sure that every client has only one token connected to a user
+    db.session.delete(toks)
+
+    expires_in = token.pop('expires_in')
+    expires = datetime.utcnow() + timedelta(seconds=expires_in)
+
+    tok = Token(**token)
+    tok.expires = expires
+    tok.client_id = request.client.client_id
+    tok.user_id = request.user.id
+    db.session.add(tok)
+    db.session.commit()
+    return tok
 
 
 test_run = set(['test', 'covtest']).intersection(set(sys.argv))

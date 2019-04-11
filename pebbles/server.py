@@ -31,6 +31,8 @@ from pebbles.views.export_stats import export_stats, ExportStatistics
 from pebbles.views.import_export import import_export, ImportExportBlueprintTemplates, ImportExportBlueprints
 from pebbles.views.namespaced_keyvalues import namespaced_keyvalues, NamespacedKeyValueList, NamespacedKeyValueView
 
+from pebbles.views.clients import clients, Clients
+
 api = restful.Api(app)
 api_root = '/api/v1'
 api.add_resource(FirstUserView, api_root + '/initialize')
@@ -83,6 +85,8 @@ api.add_resource(ExportStatistics, api_root + '/export_stats/export_statistics')
 api.add_resource(NamespacedKeyValueList, api_root + '/namespaced_keyvalues')
 api.add_resource(NamespacedKeyValueView, api_root + '/namespaced_keyvalues/<string:namespace>/<string:key>')
 
+api.add_resource(Clients, api_root + '/clients')
+
 app.register_blueprint(blueprint_templates)
 app.register_blueprint(blueprints)
 app.register_blueprint(plugins)
@@ -100,6 +104,8 @@ app.register_blueprint(import_export)
 app.register_blueprint(stats)
 app.register_blueprint(export_stats)
 app.register_blueprint(namespaced_keyvalues)
+
+app.register_blueprint(clients)
 
 admin_icons = ["Dashboard", "Users", "Groups", "Blueprints", "Configure", "Statistics", "Account"]
 group_owner_icons = ["Dashboard", "", "Groups", "Blueprints", "", "", "Account"]
