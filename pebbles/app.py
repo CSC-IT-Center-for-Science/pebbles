@@ -11,6 +11,10 @@ from pebbles.config import BaseConfig, TestConfig
 from flask_oauthlib.provider import OAuth2Provider
 from datetime import datetime, timedelta
 
+from pebbles.views.common import auth
+from flask import g, abort, request, render_template, jsonify
+
+
 app = Flask(__name__, static_url_path='')
 migrate = Migrate(app, db)
 
@@ -32,6 +36,31 @@ def favicon():
 @oauth.token_handler
 def access_token():
     return None
+
+
+@app.route('/api/oauth/authorize', methods=['GET', 'POST'])
+@oauth.authorize_handler
+@auth.login_required
+def authorize(*args, **kwargs):
+    user = g.user
+    if not user:
+        abort(404)
+    if request.method == 'GET':
+        client_id = kwargs.get('client_id')
+        client = Client.query.filter_by(client_id=client_id).first()
+        kwargs['client'] = client
+        kwargs['user'] = user
+        return render_template('authorize.html', **kwargs)
+
+    confirm = request.form.get('confirm', 'no')
+    return confirm == 'yes'
+
+
+@app.route('/api/me')
+@oauth.require_oauth()
+def me(req):
+    user = req.user
+    return jsonify(username=user.username)
 
 
 @oauth.clientgetter
