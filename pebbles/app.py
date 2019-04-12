@@ -11,7 +11,7 @@ from pebbles.config import BaseConfig, TestConfig
 from flask_oauthlib.provider import OAuth2Provider
 from datetime import datetime, timedelta
 
-from pebbles.views.common import auth
+from pebbles.views.commons import auth
 from flask import g, abort, request, render_template, jsonify
 
 
