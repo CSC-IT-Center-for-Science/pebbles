@@ -1,10 +1,11 @@
 from flask.ext.restful import fields
 from flask.ext.httpauth import HTTPBasicAuth
-from flask import g, render_template, abort
+from flask import g, abort
+# from flask import render_template
 import logging
 from pebbles.models import db, ActivationToken, User, Group, GroupUserAssociation
-from pebbles.server import app
-from pebbles.tasks import send_mails
+# from pebbles.server import app
+# from pebbles.tasks import send_mails
 from functools import wraps
 import re
 
@@ -40,7 +41,9 @@ auth.authenticate_header = lambda: "Authentication Required"
 
 @auth.verify_password
 def verify_password(userid_or_token, password):
-    g.user = User.verify_auth_token(userid_or_token, app.config['SECRET_KEY'])
+    #    g.user = User.verify_auth_token(userid_or_token, app.config['SECRET_KEY'])
+    g.user = User.verify_auth_token(userid_or_token, 'change_me')
+
     if not g.user:
         g.user = User.query.filter_by(eppn=userid_or_token).first()
         if not g.user:
@@ -51,7 +54,8 @@ def verify_password(userid_or_token, password):
 
 
 def create_worker():
-    return create_user('worker@pebbles', app.config['SECRET_KEY'], is_admin=True, email_id=None)
+    # return create_user('worker@pebbles', app.config['SECRET_KEY'], is_admin=True, email_id=None)
+    return create_user('worker@pebbles', 'change_me', is_admin=True, email_id=None)
 
 
 def create_user(eppn, password, is_admin=False, email_id=None):
@@ -94,16 +98,16 @@ def invite_user(eppn=None, password=None, is_admin=False, expiry_date=None):
     db.session.add(token)
     db.session.commit()
 
-    if not app.dynamic_config['SKIP_TASK_QUEUE'] and not app.dynamic_config['MAIL_SUPPRESS_SEND']:
-        send_mails.delay([(user.eppn, token.token, user.is_active)])
-    else:
-        logging.warn(
-            "email sending suppressed in config: SKIP_TASK_QUEUE:%s MAIL_SUPPRESS_SEND:%s" %
-            (app.dynamic_config['SKIP_TASK_QUEUE'], app.dynamic_config['MAIL_SUPPRESS_SEND'])
-        )
-        activation_url = '%s/#/activate/%s' % (app.config['BASE_URL'], token.token)
-        content = render_template('invitation.txt', activation_link=activation_url)
-        logging.warn(content)
+#    if not app.dynamic_config['SKIP_TASK_QUEUE'] and not app.dynamic_config['MAIL_SUPPRESS_SEND']:
+#        send_mails.delay([(user.eppn, token.token, user.is_active)])
+#    else:
+#        logging.warn(
+#            "email sending suppressed in config: SKIP_TASK_QUEUE:%s MAIL_SUPPRESS_SEND:%s" %
+#            (app.dynamic_config['SKIP_TASK_QUEUE'], app.dynamic_config['MAIL_SUPPRESS_SEND'])
+#        )
+#        activation_url = '%s/#/activate/%s' % (app.config['BASE_URL'], token.token)
+#        content = render_template('invitation.txt', activation_link=activation_url)
+#        logging.warn(content)
 
     return user
 
