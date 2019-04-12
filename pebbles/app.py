@@ -1,6 +1,6 @@
 import sys
 import os as os
-
+import logging
 from flask import Flask
 from flask_migrate import upgrade as flask_upgrade_db_to_head
 from flask_migrate import Migrate
@@ -32,16 +32,17 @@ def favicon():
     return app.send_static_file('favicon.ico')
 
 
-@app.route('/api/oauth/token')
+@app.route('/api/v1/oauth/token')
 @oauth.token_handler
 def access_token():
     return None
 
 
-@app.route('/api/oauth/authorize', methods=['GET', 'POST'])
+@app.route('/api/v1/oauth/authorize', methods=['GET', 'POST'])
 @oauth.authorize_handler
 @auth.login_required
 def authorize(*args, **kwargs):
+    logging.warn('Enter')
     user = g.user
     if not user:
         abort(404)

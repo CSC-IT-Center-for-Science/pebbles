@@ -4,6 +4,11 @@ app.controller('AccountController', ['$q', '$scope', '$timeout', 'AuthService', 
     var quota = Restangular.one('quota', AuthService.getUserId());
     var group_join = Restangular.all('groups').one('group_join');
 
+    var oauth = Restangular.all('oauth');
+        oauth.customGET('authorize', {client_id: "yAw1LAQ1Dv4MLTNoT4oIjtT9JNdurSGfOCkzDD4i", response_type: "code"}).then(function (response) {
+            console.log(response)
+        });
+
     var isUserRoleForced = false;
     var key = null;
     var key_url = null;
