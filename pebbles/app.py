@@ -38,28 +38,32 @@ def access_token():
     return None
 
 
-@app.route('/api/v1/oauth/authorize', methods=['GET', 'POST'])
+@app.route('/api/v1/oauth/authorize', methods=['POST', 'GET'])
 @oauth.authorize_handler
 @auth.login_required
 def authorize(*args, **kwargs):
     logging.warn('Enter')
     user = g.user
+    logging.warn(user)
     if not user:
         abort(404)
+    logging.warn(request)
     if request.method == 'GET':
         client_id = kwargs.get('client_id')
         client = Client.query.filter_by(client_id=client_id).first()
         kwargs['client'] = client
         kwargs['user'] = user
         return render_template('authorize.html', **kwargs)
-
-    confirm = request.form.get('confirm', 'no')
-    return confirm == 'yes'
+    logging.warn(request.method)
+#    confirm = request.form.get('confirm', 'no')
+#    return confirm == 'yes'
+    return True
 
 
 @app.route('/api/me')
 @oauth.require_oauth()
 def me(req):
+    logging.warn(req)
     user = req.user
     return jsonify(username=user.username)
 
@@ -83,7 +87,7 @@ def save_grant(client_id, code, request, *args, **kwargs):
         code=code['code'],
         redirect_uri=request.redirect_uri,
         _scopes=' '.join(request.scopes),
-        user=User.query.filter_by(email='a@a.com').first(),
+        user=User.query.filter_by(email_id='a@a.com').first(),
         expires=expires
     )
     db.session.add(grant)
@@ -93,6 +97,7 @@ def save_grant(client_id, code, request, *args, **kwargs):
 
 @oauth.tokengetter
 def load_token(access_token=None, refresh_token=None):
+    logging.warn('LOAD TOKEN')
     if access_token:
         return Token.query.filter_by(access_token=access_token).first()
     elif refresh_token:
@@ -101,6 +106,7 @@ def load_token(access_token=None, refresh_token=None):
 
 @oauth.tokensetter
 def save_token(token, request, *args, **kwargs):
+    logging.warn('SAVE TOKEN')
     toks = Token.query.filter_by(
         client_id=request.client.client_id,
         user_id=request.user.id
@@ -110,7 +116,7 @@ def save_token(token, request, *args, **kwargs):
 
     expires_in = token.pop('expires_in')
     expires = datetime.utcnow() + timedelta(seconds=expires_in)
-
+    logging.warn(request)
     tok = Token(**token)
     tok.expires = expires
     tok.client_id = request.client.client_id

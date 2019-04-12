@@ -26,7 +26,7 @@ class Clients(restful.Resource):
             client_id=gen_salt(40),
             client_secret=gen_salt(50),
             _redirect_uris='http://localhost:8000/authorized',
-            _default_scopes='email',
+            _default_scopes='email_id',
             user_id=user.id,
         )
         db.session.add(item)

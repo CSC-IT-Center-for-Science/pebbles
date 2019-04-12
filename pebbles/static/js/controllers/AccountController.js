@@ -5,9 +5,19 @@ app.controller('AccountController', ['$q', '$scope', '$timeout', 'AuthService', 
     var group_join = Restangular.all('groups').one('group_join');
 
     var oauth = Restangular.all('oauth');
-        oauth.customGET('authorize', {client_id: "yAw1LAQ1Dv4MLTNoT4oIjtT9JNdurSGfOCkzDD4i", response_type: "code"}).then(function (response) {
-            console.log(response)
-        });
+//        oauth.customGET('authorize', {client_id: "yAw1LAQ1Dv4MLTNoT4oIjtT9JNdurSGfOCkzDD4i", response_type: "code"}).then(function (response) {
+//           console.log(response)
+//        });
+
+oauth.all('authorize').post('', {client_id: 'WIHaImrHpEC89TNec3HB9t5iDeDrDpBjfGTkrV6o', response_type: 'code', scope: 'email_id'}).then(function (response) {
+    console.log(response);
+}, function(res) {
+    console.log(res);
+});
+
+//oauth.one('authorize').customPOST({scope: 'email'}).then(function (response) {
+//            console.log(response)
+//       });
 
     var isUserRoleForced = false;
     var key = null;
