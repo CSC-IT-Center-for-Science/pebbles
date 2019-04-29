@@ -232,6 +232,8 @@ class Client(db.Model):
     @property
     def redirect_uris(self):
         if self._redirect_uris:
+            print(self._redirect_uris)
+            print(self._redirect_uris.split())
             return self._redirect_uris.split()
         return []
 

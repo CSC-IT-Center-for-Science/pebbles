@@ -27,7 +27,7 @@ def root():
     return app.send_static_file('index.html')
 
 
-@app.route('/favicon.ico')
+@app.route('/favicon.icon')
 def favicon():
     return app.send_static_file('favicon.ico')
 
@@ -35,6 +35,7 @@ def favicon():
 @app.route('/api/v1/oauth/token')
 @oauth.token_handler
 def access_token():
+    logging.warn('token')
     return None
 
 
@@ -81,7 +82,7 @@ def load_grant(client_id, code):
 @oauth.grantsetter
 def save_grant(client_id, code, request, *args, **kwargs):
     # decide the expires time yourself
-    expires = datetime.utcnow() + timedelta(seconds=100)
+    expires = datetime.utcnow() + timedelta(seconds=10000000000)
     grant = Grant(
         client_id=client_id,
         code=code['code'],
@@ -107,22 +108,33 @@ def load_token(access_token=None, refresh_token=None):
 @oauth.tokensetter
 def save_token(token, request, *args, **kwargs):
     logging.warn('SAVE TOKEN')
-    toks = Token.query.filter_by(
-        client_id=request.client.client_id,
-        user_id=request.user.id
-    ).all()
-    # make sure that every client has only one token connected to a user
-    db.session.delete(toks)
-
+    logging.warn(token)
+    try:
+        toks = Token.query.filter_by(
+            client_id=request.client.client_id,
+            user_id=request.user.id
+        ).all()
+        # make sure that every client has only one token connected to a user
+        db.session.delete(toks)
+    except Exception as e:
+        print(e)
+    logging.warn('DELETED TOKEN')
     expires_in = token.pop('expires_in')
     expires = datetime.utcnow() + timedelta(seconds=expires_in)
+    scope = token.pop('scope')
     logging.warn(request)
-    tok = Token(**token)
-    tok.expires = expires
-    tok.client_id = request.client.client_id
-    tok.user_id = request.user.id
-    db.session.add(tok)
-    db.session.commit()
+    logging.warn(request.client)
+    logging.warn(request.user)
+    try:
+        tok = Token(**token)
+        tok.expires = expires
+        tok.client_id = request.client.client_id
+        tok.user_id = request.user.id
+        tok._scopes = scope
+        db.session.add(tok)
+        db.session.commit()
+    except Exception as e:
+        logging.warn(e, exc_info=True)
     return tok
 
 
