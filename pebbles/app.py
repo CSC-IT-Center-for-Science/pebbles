@@ -43,30 +43,28 @@ def access_token():
 @oauth.authorize_handler
 @auth.login_required
 def authorize(*args, **kwargs):
-    logging.warn('Enter')
     user = g.user
-    logging.warn(user)
     if not user:
         abort(404)
-    logging.warn(request)
     if request.method == 'GET':
         client_id = kwargs.get('client_id')
         client = Client.query.filter_by(client_id=client_id).first()
         kwargs['client'] = client
         kwargs['user'] = user
         return render_template('authorize.html', **kwargs)
-    logging.warn(request.method)
 #    confirm = request.form.get('confirm', 'no')
 #    return confirm == 'yes'
     return True
 
 
 @app.route('/api/me')
-@oauth.require_oauth()
-def me(req):
-    logging.warn(req)
+@oauth.require_oauth('email_id')
+def me():
+    req = request.oauth
+    print(request.oauth.user.email_id)
+    print(request.oauth.access_token)
     user = req.user
-    return jsonify(username=user.username)
+    return jsonify(username=user.email_id)
 
 
 @oauth.clientgetter
@@ -99,6 +97,8 @@ def save_grant(client_id, code, request, *args, **kwargs):
 @oauth.tokengetter
 def load_token(access_token=None, refresh_token=None):
     logging.warn('LOAD TOKEN')
+    logging.warn(access_token)
+    logging.warn(refresh_token)
     if access_token:
         return Token.query.filter_by(access_token=access_token).first()
     elif refresh_token:
@@ -119,10 +119,9 @@ def save_token(token, request, *args, **kwargs):
     except Exception as e:
         print(e)
     logging.warn('DELETED TOKEN')
-    expires_in = token.pop('expires_in')
-    expires = datetime.utcnow() + timedelta(seconds=expires_in)
+    # expires_in = token.pop('expires_in')
+    expires = datetime.utcnow() + timedelta(seconds=360000)
     scope = token.pop('scope')
-    logging.warn(request)
     logging.warn(request.client)
     logging.warn(request.user)
     try:
