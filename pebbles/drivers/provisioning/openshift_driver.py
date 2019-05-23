@@ -355,6 +355,22 @@ class OpenShiftDriver(base_driver.ProvisioningDriverBase):
 
         pbclient = ap.get_pb_client(token, self.config['INTERNAL_API_BASE_URL'], ssl_verify=False)
 
+        client_info = pbclient.create_oauth_client()
+        client_id = client_info['client_id']
+        client_secret = client_info['client_secret']
+        grant = pbclient.create_oauth_grant(params={'client_id': client_id})
+        grant_type = 'authorization_code'
+        grant = pbclient.get_oauth_grant()
+        grant_code = grant['code']
+
+        token_params = {}
+        token_params['grant_type'] = grant_type
+        token_params['code'] = grant_code
+        token_params['client_id'] = client_id
+        token_params['client_secret'] = client_secret
+        token_params['redirect_uri'] = 'http://localhost:8000/authorized'
+        oauth_token = pbclient.create_and_get_oauth_token(params=token_params)
+
         log_uploader = self.create_prov_log_uploader(token, instance_id, log_type='provisioning')
 
         instance = pbclient.get_instance_description(instance_id)

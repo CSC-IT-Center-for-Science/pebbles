@@ -190,3 +190,29 @@ class PBClient(object):
             return resp.json()
         else:
             raise RuntimeError('Error deleting record: %s %s, %s' % (namespace, key, resp.reason))
+
+    def create_oauth_client(self):
+        resp = self.do_post('oauth_clients')
+        if resp.status_code != 200:
+            raise RuntimeError('Error creating oauth2 client: %s, %s' % resp.reason)
+        return resp.json()
+
+    def create_oauth_grant(self, params):
+        params['response_type'] = 'code'
+        params['scope'] = 'email_id'
+        resp = self.do_post('oauth/authorize', params)
+        if resp.status_code != 302:
+            raise RuntimeError('Error creating oauth2 grant: %s, %s' % resp.reason)
+        return resp.json()
+
+    def get_oauth_grant(self, params):
+        resp = self.do_get('oauth/grant', params)
+        if resp.status_code != 200:
+            raise RuntimeError('Error getting oauth2 grant: %s, %s' % resp.reason)
+        return resp.json()
+
+    def create_and_get_oauth_token(self, params):
+        resp = self.do_get('oauth/token', params)
+        if resp.status_code != 200:
+            raise RuntimeError('Error getting oauth2 grant: %s, %s' % resp.reason)
+        return resp.json()
