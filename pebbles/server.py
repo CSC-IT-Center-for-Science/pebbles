@@ -19,6 +19,7 @@ from pebbles.views.users import users, UserList, UserView, UserActivationUrl, Us
 from pebbles.views.groups import groups, GroupList, GroupView, GroupJoin, GroupListExit, GroupExit, GroupUsersList, ClearUsersFromGroup
 from pebbles.views.notifications import NotificationList, NotificationView
 from pebbles.views.instances import instances, InstanceList, InstanceView, InstanceLogs, InstanceToken
+from pebbles.views.authorize_instances import authorize_instances, AuthorizeInstanceView
 from pebbles.views.activations import activations, ActivationList, ActivationView
 from pebbles.views.firstuser import firstuser, FirstUserView
 from pebbles.views.myip import myip, WhatIsMyIp
@@ -70,6 +71,7 @@ api.add_resource(
     api_root + '/instances/<string:instance_id>/logs',
     methods=['GET', 'PATCH', 'DELETE'])
 api.add_resource(InstanceToken, api_root + '/instance_tokens/<string:instance_id>')
+api.add_resource(AuthorizeInstanceView, api_root + '/authorize_instances/<string:token_id>/<string:instance_id>')
 api.add_resource(PluginList, api_root + '/plugins')
 api.add_resource(PluginView, api_root + '/plugins/<string:plugin_id>')
 api.add_resource(PublicVariableList, api_root + '/config')
@@ -101,6 +103,7 @@ app.register_blueprint(import_export)
 app.register_blueprint(stats)
 app.register_blueprint(export_stats)
 app.register_blueprint(namespaced_keyvalues)
+app.register_blueprint(authorize_instances)
 
 admin_icons = ["Dashboard", "Users", "Groups", "Blueprints", "Configure", "Statistics", "Account"]
 group_owner_icons = ["Dashboard", "", "Groups", "Blueprints", "", "", "Account"]
