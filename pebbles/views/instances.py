@@ -389,3 +389,23 @@ def process_logs(instance_id, log_record):
     instance_log.message = log_record['message']
 
     return instance_log
+
+
+class InstanceToken(restful.Resource):
+    parser = reqparse.RequestParser()
+    parser.add_argument('instance_hours', type=positive_integer)
+
+    @auth.login_required
+    def post(self, instance_id):
+        instance = Instance.query.filter_by(id=instance_id).first()
+        if not instance:
+            abort(404)
+        args = self.parser.parse_args()
+        instance_hours = args.instance_hours
+        if not instance_hours:
+            logging.warn('no instance hours parameter found')
+            abort(422)
+
+        token = InstanceToken(instance_id, instance_hours)
+
+        return token

@@ -127,6 +127,13 @@ class PBClient(object):
             raise RuntimeError('Unable to delete running logs for instance %s, %s' % (instance_id, resp.reason))
         return resp
 
+    def create_instance_token(self, instance_id, instance_hours):
+        params = {'instance_hours': instance_hours}
+        resp = self.do_post('instance_tokens' % instance_id, params)
+        if resp.status_code != 200:
+            raise RuntimeError('Cannot fetch data for provisioned blueprints, %s' % resp.reason)
+        return resp.json()
+
     def get_plugin_data(self, plugin_id):
         resp = self.do_get('plugins/%s' % plugin_id)
         if resp.status_code != 200:

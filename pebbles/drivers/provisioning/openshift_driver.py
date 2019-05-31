@@ -363,6 +363,11 @@ class OpenShiftDriver(base_driver.ProvisioningDriverBase):
         blueprint = pbclient.get_blueprint_description(instance['blueprint_id'])
         blueprint_config = blueprint['full_config']
 
+        instance_token = None
+        if 'auto_authentication' in blueprint_config and blueprint_config['auto_authentication']:
+            instance_hours = int(blueprint_config['maximum_lifetime'])
+            instance_token = pbclient.create_instance_token(instance_id, instance_hours)
+
         # get/generate a project name
         project_name = self._get_project_name(instance)
 
@@ -401,6 +406,11 @@ class OpenShiftDriver(base_driver.ProvisioningDriverBase):
             'project_name': project_name,
             'spawn_ts': cur_ts
         }
+
+        if instance_token:
+            endpoints = instance_data['endpoints']
+            for endpoint_i in endpoints:
+                endpoints[endpoint_i]['access'] += '?' + instance_token
 
         if 'show_password' in blueprint_config and blueprint_config['show_password']:
             instance_data['password'] = instance_id

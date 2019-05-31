@@ -53,6 +53,17 @@ CONFIG = {
                 'title': 'environment variables for docker, separated by space',
                 'default': '',
             },
+            'auto_authentication': {
+                'type': 'object',
+                'title': 'Authentication',
+                'properties': {
+                    'auto_authenticate': {
+                        'type': 'boolean',
+                        'title': 'Auto Authenticate',
+                        'default': False,
+                    }
+                }
+            }
         }
     },
     'form': [
@@ -68,7 +79,8 @@ CONFIG = {
         'environment_vars',
         'maximum_instances_per_user',
         'maximum_lifetime',
-        'cost_multiplier'
+        'cost_multiplier',
+        'auto_authentication'
     ],
     'model': {
         'name': 'openshift_template_testing',
