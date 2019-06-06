@@ -13,8 +13,8 @@ case $CELERY_CMD in
             -A pebbles.tasks.celery_app $CELERY_APP_ARGS \
             -Ofair \
             --loglevel=$CELERY_LOGLEVEL \
-            --concurrency=8 \
-            --maxtasksperchild=50
+            --concurrency=1 \
+            --maxtasksperchild=1
     ;;
     beat)
         celery beat \
