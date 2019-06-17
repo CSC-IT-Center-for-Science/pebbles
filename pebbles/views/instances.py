@@ -397,15 +397,18 @@ class InstanceToken(restful.Resource):
 
     @auth.login_required
     def post(self, instance_id):
+        logging.warn(instance_id)
         instance = Instance.query.filter_by(id=instance_id).first()
         if not instance:
             abort(404)
         args = self.parser.parse_args()
+        logging.warn(args)
         instance_hours = args.instance_hours
         if not instance_hours:
             logging.warn('no instance hours parameter found')
             abort(422)
 
         token = InstanceToken(instance_id, instance_hours)
+        logging.warn(token)
 
         return token
