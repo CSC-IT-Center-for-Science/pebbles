@@ -128,8 +128,11 @@ class PBClient(object):
         return resp
 
     def create_instance_token(self, instance_id, instance_hours):
-        params = {'instance_hours': instance_hours}
-        resp = self.do_post('instance_tokens' % instance_id, params)
+        headers = {'Accept': 'text/plain',
+                   'Authorization': 'Basic %s' % self.auth}
+        payload = {'instance_hours': instance_hours}
+        url = 'instance_tokens' % instance_id
+        resp = requests.post(url, json=payload, headers=headers, verify=self.ssl_verify)
         if resp.status_code != 200:
             raise RuntimeError('Cannot fetch data for provisioned blueprints, %s' % resp.reason)
         return resp.json()

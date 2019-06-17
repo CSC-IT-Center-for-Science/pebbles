@@ -30,6 +30,8 @@ from six.moves.urllib.parse import urlparse, parse_qs
 from pebbles.client import PBClient
 from pebbles.drivers.provisioning import base_driver
 
+from pebbles.utils import parse_maximum_lifetime
+
 # maximum time to wait for pod creation before failing
 MAX_POD_SPAWN_WAIT_TIME_SEC = 900
 # maximum time to wait for pod (down) scaling
@@ -365,7 +367,7 @@ class OpenShiftDriver(base_driver.ProvisioningDriverBase):
 
         instance_token = None
         if 'auto_authentication' in blueprint_config and blueprint_config['auto_authentication']:
-            instance_hours = int(blueprint_config['maximum_lifetime'])
+            instance_hours = parse_maximum_lifetime(blueprint_config['maximum_lifetime'])
             instance_token = pbclient.create_instance_token(instance_id, instance_hours)
 
         # get/generate a project name

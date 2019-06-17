@@ -54,15 +54,9 @@ CONFIG = {
                 'default': '',
             },
             'auto_authentication': {
-                'type': 'object',
-                'title': 'Authentication',
-                'properties': {
-                    'auto_authenticate': {
-                        'type': 'boolean',
-                        'title': 'Auto Authenticate',
-                        'default': False,
-                    }
-                }
+                'type': 'boolean',
+                'title': 'Auto Authenticate',
+                'default': False,
             }
         }
     },
