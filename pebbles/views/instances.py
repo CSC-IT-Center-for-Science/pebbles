@@ -6,7 +6,7 @@ import datetime
 import logging
 import json
 
-from pebbles.models import db, Blueprint, Instance, InstanceLog, User
+from pebbles.models import db, Blueprint, Instance, InstanceLog, InstanceToken, User
 from pebbles.forms import InstanceForm, UserIPForm
 from pebbles.server import app, restful
 from pebbles.utils import requires_admin, memoize
@@ -391,7 +391,7 @@ def process_logs(instance_id, log_record):
     return instance_log
 
 
-class InstanceToken(restful.Resource):
+class InstanceTokens(restful.Resource):
     parser = reqparse.RequestParser()
     parser.add_argument('instance_hours', type=positive_integer)
 
@@ -414,4 +414,6 @@ class InstanceToken(restful.Resource):
             logging.warn(e)
         logging.warn(token)
 
+        db.session.add(token)
+        db.session.commit()
         return token
