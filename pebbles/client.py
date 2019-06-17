@@ -1,6 +1,5 @@
 import base64
 import requests
-import warnings
 
 
 class PBClient(object):
@@ -134,7 +133,6 @@ class PBClient(object):
         payload = {'instance_hours': instance_hours}
         url = '%s/instance_tokens/%s' % (self.api_base_url, instance_id)
         resp = requests.post(url, json=payload, headers=headers, verify=self.ssl_verify)
-        warnings.warn(resp)
         # if resp.status_code != 200:
         #    raise RuntimeError('Cannot fetch data for provisioned blueprints, %s' % resp.reason)
         return resp
