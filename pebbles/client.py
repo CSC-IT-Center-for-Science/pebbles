@@ -131,7 +131,7 @@ class PBClient(object):
         headers = {'Accept': 'text/plain',
                    'Authorization': 'Basic %s' % self.auth}
         payload = {'instance_hours': instance_hours}
-        url = 'instance_tokens/%s' % instance_id
+        url = '%s/instance_tokens/%s' % (self.api_base_url, instance_id)
         resp = requests.post(url, json=payload, headers=headers, verify=self.ssl_verify)
         if resp.status_code != 200:
             raise RuntimeError('Cannot fetch data for provisioned blueprints, %s' % resp.reason)
