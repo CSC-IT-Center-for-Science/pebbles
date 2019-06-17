@@ -408,7 +408,10 @@ class InstanceToken(restful.Resource):
             logging.warn('no instance hours parameter found')
             abort(422)
 
-        token = InstanceToken(instance_id, instance_hours)
+        try:
+            token = InstanceToken(instance_id, instance_hours)
+        except Exception as e:
+            logging.warn(e)
         logging.warn(token)
 
         return token
