@@ -412,7 +412,7 @@ class OpenShiftDriver(base_driver.ProvisioningDriverBase):
         if instance_token:
             endpoints = instance_data['endpoints']
             for endpoint_i in endpoints:
-                endpoints[endpoint_i]['access'] += '?' + instance_token
+                endpoint_i['access'] += '?' + instance_token
 
         if 'show_password' in blueprint_config and blueprint_config['show_password']:
             instance_data['password'] = instance_id
