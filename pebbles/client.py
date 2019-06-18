@@ -133,9 +133,9 @@ class PBClient(object):
         payload = {'instance_hours': instance_hours}
         url = '%s/instance_tokens/%s' % (self.api_base_url, instance_id)
         resp = requests.post(url, json=payload, headers=headers, verify=self.ssl_verify)
-        # if resp.status_code != 200:
-        #    raise RuntimeError('Cannot fetch data for provisioned blueprints, %s' % resp.reason)
-        return resp
+        if resp.status_code != 200:
+            raise RuntimeError('Cannot crate token, %s' % resp.reason)
+        return resp.json()
 
     def get_plugin_data(self, plugin_id):
         resp = self.do_get('plugins/%s' % plugin_id)
