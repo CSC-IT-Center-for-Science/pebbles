@@ -1,5 +1,6 @@
 from flask import abort, Blueprint
 
+import datetime
 import logging
 
 from pebbles.models import InstanceToken
@@ -13,7 +14,14 @@ class AuthorizeInstanceView(restful.Resource):
 
         instance_token = InstanceToken.query.filter_by(token=token_id).first()
         if not instance_token:
-            logging.warn("instance token %s not found or expired" % token_id)
+            logging.warn("instance token %s not found" % token_id)
+            return abort(404)
+
+        curr_time = datetime.datetime.utcnow()
+        expires_on = instance_token.expires_on
+
+        if curr_time > expires_on:
+            logging.warn("instance token %s has expired" % token_id)
             return abort(410)
 
         if instance_token.instance_id != instance_id:
