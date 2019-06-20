@@ -25,9 +25,10 @@ services:
     - APP_MODULE=pebbles.server:app
     - DB_AUTOMIGRATION=1
     - PB_SQLALCHEMY_DATABASE_URI=postgresql://pebbles:pebbles@db/pebbles
-# Uncomment to mount the source directory for local development
-#    volumes:
-#    - ..:/opt/app-root/src:ro
+    - APP_CONFIG=/opt/app-root/src/deployment/gunicorn-debug.cfg
+    volumes:
+    # mount the source directory for local development
+    - ..:/opt/app-root/src:ro
 
   worker:
     image: cscfi/pebbles:latest
@@ -41,9 +42,8 @@ services:
     - CELERY_QUEUE=provisioning_tasks-1
     - CELERY_LOGLEVEL=DEBUG
     volumes:
-    - /var/run/pebbles/osop_m2m_creds.txt:/var/run/pebbles_m2m
-# Uncomment to mount the source directory for local development
-#    - ..:/opt/app-root/src:ro
+    # mount the source directory for local development
+    - ..:/opt/app-root/src:ro
 
   system-worker:
     image: cscfi/pebbles:latest
@@ -57,9 +57,8 @@ services:
     - CELERY_QUEUE=system_tasks
     - CELERY_LOGLEVEL=DEBUG
     volumes:
-    - /var/run/pebbles/osop_m2m_creds.txt:/var/run/pebbles_m2m
-# Uncomment to mount the source directory for local development
-#    - ..:/opt/app-root/src:ro
+# mount the source directory for local development
+    - ..:/opt/app-root/src:ro
 
   periodical-worker:
     image: cscfi/pebbles:latest

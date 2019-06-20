@@ -355,6 +355,7 @@ objects:
   metadata:
     name: ${DATABASE_SERVICE_NAME}
   spec:
+    storageClassName: 'standard-rwo'
     accessModes:
     - ReadWriteOnce
     resources:

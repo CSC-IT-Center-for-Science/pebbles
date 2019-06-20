@@ -27,3 +27,9 @@ htmlcov/
 build/
 dist/
 pebbles-4.0.0.dev1-py2.7.egg-info/
+
+# MacOS Finder cache
+.DS_Store
+
+#VSCode settings
+.vscode
