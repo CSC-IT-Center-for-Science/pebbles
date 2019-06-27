@@ -9,6 +9,12 @@ from pebbles.server import restful
 authorize_instances = Blueprint('authorize_instances', __name__)
 
 
+class AuthorizeInstancesView(restful.Resource):
+    def get(self):
+
+        return 200
+
+
 class AuthorizeInstanceView(restful.Resource):
     def get(self, token_id, instance_id):
 
@@ -28,4 +34,4 @@ class AuthorizeInstanceView(restful.Resource):
             logging.warn("instance id %s from the token does not match the instance_id %s passed as a parameter" % (instance_token.instance_id, instance_id))
             return abort(403)
 
-        return 200
+        return {token_id: instance_id}, 200
