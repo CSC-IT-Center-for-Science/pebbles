@@ -1,4 +1,4 @@
-from flask import abort, Blueprint
+from flask import abort, request, Response, Blueprint
 
 import datetime
 import logging
@@ -11,7 +11,7 @@ authorize_instances = Blueprint('authorize_instances', __name__)
 
 class AuthorizeInstancesView(restful.Resource):
     def get(self):
-
+        logging.warn(request.headers)
         return 200
 
 
@@ -34,4 +34,8 @@ class AuthorizeInstanceView(restful.Resource):
             logging.warn("instance id %s from the token does not match the instance_id %s passed as a parameter" % (instance_token.instance_id, instance_id))
             return abort(403)
 
-        return {token_id: instance_id}, 200
+        resp = Response("Authorized")
+        resp.headers["ORIGINAL_TOKEN"] = token_id
+        resp.headers["INSTANCE_ID"] = instance_id
+
+        return resp, 200
