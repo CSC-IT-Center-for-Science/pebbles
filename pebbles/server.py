@@ -19,7 +19,7 @@ from pebbles.views.users import users, UserList, UserView, UserActivationUrl, Us
 from pebbles.views.groups import groups, GroupList, GroupView, GroupJoin, GroupListExit, GroupExit, GroupUsersList, ClearUsersFromGroup
 from pebbles.views.notifications import NotificationList, NotificationView
 from pebbles.views.instances import instances, InstanceList, InstanceView, InstanceLogs, InstanceTokens
-from pebbles.views.authorize_instances import authorize_instances, AuthorizeInstanceView
+from pebbles.views.authorize_instances import authorize_instances, AuthorizeInstanceView, AuthorizeInstancesView
 from pebbles.views.activations import activations, ActivationList, ActivationView
 from pebbles.views.firstuser import firstuser, FirstUserView
 from pebbles.views.myip import myip, WhatIsMyIp
@@ -72,6 +72,7 @@ api.add_resource(
     methods=['GET', 'PATCH', 'DELETE'])
 api.add_resource(InstanceTokens, api_root + '/instance_tokens/<string:instance_id>')
 api.add_resource(AuthorizeInstanceView, api_root + '/authorize_instances/<string:token_id>/<string:instance_id>')
+api.add_resource(AuthorizeInstancesView, api_root + '/authorize_instancess')
 api.add_resource(PluginList, api_root + '/plugins')
 api.add_resource(PluginView, api_root + '/plugins/<string:plugin_id>')
 api.add_resource(PublicVariableList, api_root + '/config')
