@@ -2,7 +2,7 @@ from flask import abort, request, Response, Blueprint
 
 import datetime
 import logging
-from urlparse import urlparse, parse_qs
+import re
 
 from pebbles.models import InstanceToken
 from pebbles.server import restful
@@ -17,13 +17,13 @@ class AuthorizeInstancesView(restful.Resource):
 
         if 'X-ORIGINAL-URI' in request.headers:
             h_uri = request.headers['X-ORIGINAL-URI']
-            parsed_uri = urlparse(h_uri)
-            queryparams = parse_qs(parsed_uri)
-            instance_token = queryparams['token'][0]
-            instance_id = queryparams['instance_id'][0]
-        if 'TOKEN' in request.headers and 'INSTANCE_ID' in request.headers:
-            instance_token = request.headers['TOKEN']
-            instance_id = request.headers['INSTANCE_ID']
+            regex_query_capture = re.search('.*\\?.*=(.*)&.*=(.*)', h_uri)
+            if regex_query_capture and len(regex_query_capture.groups()) == 2:
+                instance_token = regex_query_capture.group(1)
+                instance_id = regex_query_capture.group(2)
+        elif 'ORIGINAL-TOKEN' in request.headers and 'INSTANCE-ID' in request.headers:
+            instance_token = request.headers['ORIGINAL-TOKEN']
+            instance_id = request.headers['INSTANCE-ID']
 
         if not instance_token and not instance_id:
             logging.warn('No instance token or id found from the headers')
@@ -46,8 +46,8 @@ class AuthorizeInstancesView(restful.Resource):
             return abort(403)
 
         resp = Response("Authorized")
-        resp.headers["ORIGINAL_TOKEN"] = instance_token
-        resp.headers["INSTANCE_ID"] = instance_id
+        resp.headers["TOKEN"] = instance_token
+        resp.headers["INSTANCE-ID"] = instance_id
         return resp, 200
 
 
