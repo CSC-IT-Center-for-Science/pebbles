@@ -15,15 +15,19 @@ class AuthorizeInstancesView(restful.Resource):
         instance_token = ''
         instance_id = ''
 
-        if 'X-ORIGINAL-URI' in request.headers:
-            h_uri = request.headers['X-ORIGINAL-URI']
-            regex_query_capture = re.search('.*\\?.*=(.*)&.*=(.*)', h_uri)
-            if regex_query_capture and len(regex_query_capture.groups()) == 2:
-                instance_token = regex_query_capture.group(1)
-                instance_id = regex_query_capture.group(2)
-        elif 'ORIGINAL-TOKEN' in request.headers and 'INSTANCE-ID' in request.headers:
+        if 'ORIGINAL-TOKEN' in request.headers and 'INSTANCE-ID' in request.headers:
             instance_token = request.headers['ORIGINAL-TOKEN']
             instance_id = request.headers['INSTANCE-ID']
+        elif 'X-ORIGINAL-URI' in request.headers:
+            h_uri = request.headers['X-ORIGINAL-URI']
+            regex_query_capture = re.search('.*\\?(.*)=(.*)&(.*)=(.*)', h_uri)
+            if regex_query_capture and len(regex_query_capture.groups()) == 4:
+                if regex_query_capture.group(1) == 'token' and regex_query_capture.group(3) == 'instance_id':
+                    instance_token = regex_query_capture.group(2)
+                    instance_id = regex_query_capture.group(4)
+                elif regex_query_capture.group(1) == 'instance_id' and regex_query_capture.group(3) == 'token':
+                    instance_id = regex_query_capture.group(2)
+                    instance_token = regex_query_capture.group(4)
 
         if not instance_token and not instance_id:
             logging.warn('No instance token or id found from the headers')
@@ -48,7 +52,7 @@ class AuthorizeInstancesView(restful.Resource):
         resp = Response("Authorized")
         resp.headers["TOKEN"] = instance_token
         resp.headers["INSTANCE-ID"] = instance_id
-        return resp, 200
+        return resp
 
 
 class AuthorizeInstanceView(restful.Resource):
