@@ -53,29 +53,3 @@ class AuthorizeInstancesView(restful.Resource):
         resp.headers["TOKEN"] = instance_token_obj.token
         resp.headers["INSTANCE-ID"] = instance_id
         return resp
-
-
-class AuthorizeInstanceView(restful.Resource):
-    def get(self, token_id, instance_id):
-
-        instance_token = InstanceToken.query.filter_by(token=token_id).first()
-        if not instance_token:
-            logging.warn("instance token %s not found" % token_id)
-            return abort(404)
-
-        curr_time = datetime.datetime.utcnow()
-        expires_on = instance_token.expires_on
-
-        if curr_time > expires_on:
-            logging.warn("instance token %s has expired" % token_id)
-            return abort(410)
-
-        if instance_token.instance_id != instance_id:
-            logging.warn("instance id %s from the token does not match the instance_id %s passed as a parameter" % (instance_token.instance_id, instance_id))
-            return abort(403)
-
-        resp = Response("Authorized")
-        resp.headers["ORIGINAL_TOKEN"] = token_id
-        resp.headers["INSTANCE_ID"] = instance_id
-
-        return resp, 200

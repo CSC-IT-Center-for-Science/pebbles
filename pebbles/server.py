@@ -71,8 +71,7 @@ api.add_resource(
     api_root + '/instances/<string:instance_id>/logs',
     methods=['GET', 'PATCH', 'DELETE'])
 api.add_resource(InstanceTokens, api_root + '/instance_tokens/<string:instance_id>')
-api.add_resource(AuthorizeInstanceView, api_root + '/authorize_instances/<string:token_id>/<string:instance_id>')
-api.add_resource(AuthorizeInstancesView, api_root + '/authorize_instancess')
+api.add_resource(AuthorizeInstancesView, api_root + '/authorize_instances')
 api.add_resource(PluginList, api_root + '/plugins')
 api.add_resource(PluginView, api_root + '/plugins/<string:plugin_id>')
 api.add_resource(PublicVariableList, api_root + '/config')
