@@ -19,7 +19,7 @@ from pebbles.views.users import users, UserList, UserView, UserActivationUrl, Us
 from pebbles.views.groups import groups, GroupList, GroupView, GroupJoin, GroupListExit, GroupExit, GroupUsersList, ClearUsersFromGroup
 from pebbles.views.notifications import NotificationList, NotificationView
 from pebbles.views.instances import instances, InstanceList, InstanceView, InstanceLogs, InstanceTokens
-from pebbles.views.authorize_instances import authorize_instances, AuthorizeInstanceView, AuthorizeInstancesView
+from pebbles.views.authorize_instances import authorize_instances, AuthorizeInstancesView
 from pebbles.views.activations import activations, ActivationList, ActivationView
 from pebbles.views.firstuser import firstuser, FirstUserView
 from pebbles.views.myip import myip, WhatIsMyIp
