@@ -391,15 +391,18 @@ def process_logs(instance_id, log_record):
     return instance_log
 
 
-class InstanceTokens(restful.Resource):
-    parser = reqparse.RequestParser()
-    parser.add_argument('instance_hours', type=positive_integer)
+class InstanceTokensList(restful.Resource):
 
     @requires_admin
     @auth.login_required
     def get(self):
         instance_tokens = InstanceToken.query.all()
         return instance_tokens
+
+
+class InstanceTokensView(restful.Resource):
+    parser = reqparse.RequestParser()
+    parser.add_argument('instance_hours', type=positive_integer)
 
     @auth.login_required
     def post(self, instance_id):
