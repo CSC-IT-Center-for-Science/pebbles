@@ -393,9 +393,10 @@ def process_logs(instance_id, log_record):
 
 class InstanceTokensList(restful.Resource):
 
-    @requires_admin
     @auth.login_required
+    @requires_admin
     def get(self):
+        logging.warn('THIS IS HEREEEEE')
         instance_tokens = InstanceToken.query.all()
         return instance_tokens
 
@@ -421,8 +422,8 @@ class InstanceTokensView(restful.Resource):
         db.session.commit()
         return token.token
 
-    @requires_admin
     @auth.login_required
+    @requires_admin
     def delete(self, instance_id):
         instance_token = InstanceToken.query.filter_by(instance_id=instance_id).first()
 
