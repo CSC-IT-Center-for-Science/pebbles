@@ -395,22 +395,36 @@ class InstanceTokens(restful.Resource):
     parser = reqparse.RequestParser()
     parser.add_argument('instance_hours', type=positive_integer)
 
+    @requires_admin
+    @auth.login_required
+    def get(self):
+        instance_tokens = InstanceToken.query.all()
+        return instance_tokens
+
     @auth.login_required
     def post(self, instance_id):
-        logging.warn(instance_id)
         instance = Instance.query.filter_by(id=instance_id).first()
         if not instance:
             abort(404)
         args = self.parser.parse_args()
-        logging.warn(args)
         instance_hours = args.instance_hours
         if not instance_hours:
             logging.warn('no instance hours parameter found')
             abort(422)
 
         token = InstanceToken(instance_id, instance_hours)
-        logging.warn(token)
 
         db.session.add(token)
         db.session.commit()
         return token.token
+
+    @requires_admin
+    @auth.login_required
+    def delete(self, instance_id):
+        instance_token = InstanceToken.query.filter_by(instance_id=instance_id).first()
+
+        if not instance_token:
+            logging.warn('no instance token found for instance id %s' % instance_id)
+            abort(404)
+        db.session.delete(instance_token)
+        db.session.commit()

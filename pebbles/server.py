@@ -70,7 +70,10 @@ api.add_resource(
     InstanceLogs,
     api_root + '/instances/<string:instance_id>/logs',
     methods=['GET', 'PATCH', 'DELETE'])
-api.add_resource(InstanceTokens, api_root + '/instance_tokens/<string:instance_id>')
+api.add_resource(
+    InstanceTokens,
+    api_root + '/instance_tokens/<string:instance_id>',
+    methods=['GET', 'POST', 'DELETE'])
 api.add_resource(AuthorizeInstancesView, api_root + '/authorize_instances')
 api.add_resource(PluginList, api_root + '/plugins')
 api.add_resource(PluginView, api_root + '/plugins/<string:plugin_id>')
