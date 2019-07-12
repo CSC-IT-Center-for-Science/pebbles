@@ -51,6 +51,12 @@ instance_log_fields = {
     'message': fields.String
 }
 
+instance_token_fields = {
+    'token': fields.String,
+    'instance_id': fields.String,
+    'expires_on': fields.DateTime
+}
+
 
 def query_blueprint(blueprint_id):
     return Blueprint.query.filter_by(id=blueprint_id).first()
@@ -395,6 +401,7 @@ class InstanceTokensList(restful.Resource):
 
     @auth.login_required
     @requires_admin
+    @marshal_with(instance_token_fields)
     def get(self):
         logging.warn('THIS IS HEREEEEE')
         instance_tokens = InstanceToken.query.all()
