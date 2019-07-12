@@ -367,8 +367,8 @@ class OpenShiftDriver(base_driver.ProvisioningDriverBase):
 
         instance_token = None
         if 'auto_authentication' in blueprint_config and blueprint_config['auto_authentication']:
-            instance_hours = parse_maximum_lifetime(blueprint_config['maximum_lifetime'])
-            instance_token = pbclient.create_instance_token(instance_id, instance_hours)
+            instance_seconds = parse_maximum_lifetime(blueprint_config['maximum_lifetime'])
+            instance_token = pbclient.create_instance_token(instance_id, instance_seconds)
 
         # get/generate a project name
         project_name = self._get_project_name(instance)

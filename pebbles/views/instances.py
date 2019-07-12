@@ -410,7 +410,7 @@ class InstanceTokensList(restful.Resource):
 
 class InstanceTokensView(restful.Resource):
     parser = reqparse.RequestParser()
-    parser.add_argument('instance_hours', type=positive_integer)
+    parser.add_argument('instance_seconds', type=positive_integer)
 
     @auth.login_required
     def post(self, instance_id):
@@ -418,12 +418,12 @@ class InstanceTokensView(restful.Resource):
         if not instance:
             abort(404)
         args = self.parser.parse_args()
-        instance_hours = args.instance_hours
-        if not instance_hours:
-            logging.warn('no instance hours parameter found')
+        instance_seconds = args.instance_seconds
+        if not instance_seconds:
+            logging.warn('no instance seconds parameter found')
             abort(422)
 
-        token = InstanceToken(instance_id, instance_hours)
+        token = InstanceToken(instance_id, instance_seconds)
 
         db.session.add(token)
         db.session.commit()

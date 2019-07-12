@@ -599,10 +599,10 @@ class InstanceToken(db.Model):
     instance_id = db.Column(db.String(32), db.ForeignKey('instances.id'))
     expires_on = db.Column(db.DateTime)
 
-    def __init__(self, instance_id, instance_hours):
+    def __init__(self, instance_id, instance_seconds):
         self.token = uuid.uuid4().hex
         self.instance_id = instance_id
-        self.expires_on = datetime.datetime.utcnow() + datetime.timedelta(hours=instance_hours)
+        self.expires_on = datetime.datetime.utcnow() + datetime.timedelta(seconds=instance_seconds)
 
     def __repr__(self):
         return self.token

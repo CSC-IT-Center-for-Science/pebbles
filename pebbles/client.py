@@ -127,10 +127,10 @@ class PBClient(object):
             raise RuntimeError('Unable to delete running logs for instance %s, %s' % (instance_id, resp.reason))
         return resp
 
-    def create_instance_token(self, instance_id, instance_hours):
+    def create_instance_token(self, instance_id, instance_seconds):
         headers = {'Accept': 'text/plain',
                    'Authorization': 'Basic %s' % self.auth}
-        payload = {'instance_hours': instance_hours}
+        payload = {'instance_seconds': instance_seconds}
         url = '%s/instance_tokens/%s' % (self.api_base_url, instance_id)
         resp = requests.post(url, json=payload, headers=headers, verify=self.ssl_verify)
         if resp.status_code != 200:
