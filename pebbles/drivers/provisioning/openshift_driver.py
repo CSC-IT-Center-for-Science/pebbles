@@ -409,6 +409,7 @@ class OpenShiftDriver(base_driver.ProvisioningDriverBase):
             'spawn_ts': cur_ts
         }
 
+        # if instance token is created, then append it along with instance id in the query string
         if instance_token:
             endpoints = instance_data['endpoints']
             for endpoint_i in endpoints:

@@ -111,7 +111,7 @@ celery_app.conf.CELERYBEAT_SCHEDULE = {
     },
     'periodic-update-every-day': {
         'task': 'pebbles.tasks.instance_token_cleanup',
-        'schedule': crontab(minute='*/1'),
+        'schedule': crontab(minute=0, hour=0),
         'options': {'expires': 60, 'queue': 'system_tasks'},
     },
     'periodic-update-every-year': {
