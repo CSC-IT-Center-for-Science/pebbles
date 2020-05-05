@@ -1,0 +1,240 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>pebbles.drivers.provisioning.openstack_driver &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="../../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../../',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for pebbles.drivers.provisioning.openstack_driver</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; ToDo: document OpenStack driver on user level here.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">json</span>
+
+<span class="kn">from</span> <span class="nn">pebbles.services.openstack_service</span> <span class="k">import</span> <span class="n">OpenStackService</span>
+<span class="kn">from</span> <span class="nn">pebbles.drivers.provisioning</span> <span class="k">import</span> <span class="n">base_driver</span>
+<span class="kn">from</span> <span class="nn">pebbles.client</span> <span class="k">import</span> <span class="n">PBClient</span>
+<span class="kn">from</span> <span class="nn">pebbles.models</span> <span class="k">import</span> <span class="n">Instance</span>
+<span class="kn">from</span> <span class="nn">pebbles.utils</span> <span class="k">import</span> <span class="n">parse_ports_string</span>
+
+<span class="n">SLEEP_BETWEEN_POLLS</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">POLL_MAX_WAIT</span> <span class="o">=</span> <span class="mi">180</span>
+
+
+<div class="viewcode-block" id="OpenStackDriver"><a class="viewcode-back" href="../../../../drivers.html#pebbles.drivers.provisioning.openstack_driver.OpenStackDriver">[docs]</a><span class="k">class</span> <span class="nc">OpenStackDriver</span><span class="p">(</span><span class="n">base_driver</span><span class="o">.</span><span class="n">ProvisioningDriverBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; ToDo: document Openstack driver on developer/sysadmin level here.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">get_oss</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">OpenStackService</span><span class="p">({</span><span class="s1">&#39;M2M_CREDENTIAL_STORE&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;M2M_CREDENTIAL_STORE&#39;</span><span class="p">]})</span>
+
+    <span class="k">def</span> <span class="nf">get_configuration</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">pebbles.drivers.provisioning.openstack_driver_config</span> <span class="k">import</span> <span class="n">CONFIG</span>
+        <span class="n">oss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_oss</span><span class="p">()</span>
+
+        <span class="n">images</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">oss</span><span class="o">.</span><span class="n">list_images</span><span class="p">()]</span>
+        <span class="n">flavors</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">oss</span><span class="o">.</span><span class="n">list_flavors</span><span class="p">()]</span>
+
+        <span class="n">config</span> <span class="o">=</span> <span class="n">CONFIG</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">config</span><span class="p">[</span><span class="s1">&#39;schema&#39;</span><span class="p">][</span><span class="s1">&#39;properties&#39;</span><span class="p">][</span><span class="s1">&#39;image&#39;</span><span class="p">][</span><span class="s1">&#39;enum&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">images</span>
+        <span class="n">config</span><span class="p">[</span><span class="s1">&#39;schema&#39;</span><span class="p">][</span><span class="s1">&#39;properties&#39;</span><span class="p">][</span><span class="s1">&#39;flavor&#39;</span><span class="p">][</span><span class="s1">&#39;enum&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">flavors</span>
+
+        <span class="k">return</span> <span class="n">config</span>
+
+    <span class="k">def</span> <span class="nf">get_running_instance_logs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="n">running_log_uploader</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_prov_log_uploader</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">,</span> <span class="n">log_type</span><span class="o">=</span><span class="s1">&#39;running&#39;</span><span class="p">)</span>
+        <span class="n">running_log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Cannot get running logs. This feature has not been implemented for the OpenStackDriver yet&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">do_update_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="n">oss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_oss</span><span class="p">()</span>
+        <span class="n">pbclient</span> <span class="o">=</span> <span class="n">PBClient</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;INTERNAL_API_BASE_URL&#39;</span><span class="p">],</span> <span class="n">ssl_verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_instance_description</span><span class="p">(</span><span class="n">instance_id</span><span class="p">)</span>
+        <span class="n">instance_data</span> <span class="o">=</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;instance_data&#39;</span><span class="p">]</span>
+        <span class="n">security_group_id</span> <span class="o">=</span> <span class="n">instance_data</span><span class="p">[</span><span class="s1">&#39;security_group_id&#39;</span><span class="p">]</span>
+
+        <span class="n">blueprint_config</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_blueprint_description</span><span class="p">(</span><span class="n">instance</span><span class="p">[</span><span class="s1">&#39;blueprint_id&#39;</span><span class="p">])</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;full_config&#39;</span><span class="p">]</span>
+
+        <span class="c1"># Delete all existing rules and add the rules using the input port string</span>
+        <span class="n">oss</span><span class="o">.</span><span class="n">clear_security_group_rules</span><span class="p">(</span><span class="n">security_group_id</span><span class="p">)</span>
+
+        <span class="n">ports_str</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;exposed_ports&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ports_str</span><span class="p">:</span>
+            <span class="n">ports_str</span> <span class="o">=</span> <span class="s1">&#39;22&#39;</span>  <span class="c1"># If the input port string is empty then use 22 as the default port</span>
+        <span class="n">ports_list</span> <span class="o">=</span> <span class="n">parse_ports_string</span><span class="p">(</span><span class="n">ports_str</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">ports</span> <span class="ow">in</span> <span class="n">ports_list</span><span class="p">:</span>
+            <span class="n">from_port</span> <span class="o">=</span> <span class="n">ports</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">to_port</span> <span class="o">=</span> <span class="n">ports</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+            <span class="n">oss</span><span class="o">.</span><span class="n">create_security_group_rule</span><span class="p">(</span>
+                <span class="n">security_group_id</span><span class="p">,</span>
+                <span class="n">from_port</span><span class="o">=</span><span class="n">from_port</span><span class="p">,</span>
+                <span class="n">to_port</span><span class="o">=</span><span class="n">to_port</span><span class="p">,</span>
+                <span class="n">cidr</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">/32&quot;</span> <span class="o">%</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;client_ip&#39;</span><span class="p">],</span>
+                <span class="n">ip_protocol</span><span class="o">=</span><span class="s1">&#39;tcp&#39;</span><span class="p">,</span>
+                <span class="n">group_id</span><span class="o">=</span><span class="kc">None</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">do_provision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;do_provision </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">instance_id</span><span class="p">)</span>
+
+        <span class="n">pbclient</span> <span class="o">=</span> <span class="n">PBClient</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;INTERNAL_API_BASE_URL&#39;</span><span class="p">],</span> <span class="n">ssl_verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_instance_description</span><span class="p">(</span><span class="n">instance_id</span><span class="p">)</span>
+
+        <span class="n">instance_name</span> <span class="o">=</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+        <span class="n">instance_user</span> <span class="o">=</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;user_id&#39;</span><span class="p">]</span>
+
+        <span class="c1"># fetch config</span>
+        <span class="n">blueprint_config</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_blueprint_description</span><span class="p">(</span><span class="n">instance</span><span class="p">[</span><span class="s1">&#39;blueprint_id&#39;</span><span class="p">])</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;full_config&#39;</span><span class="p">]</span>
+
+        <span class="n">log_uploader</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_prov_log_uploader</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">,</span> <span class="n">log_type</span><span class="o">=</span><span class="s1">&#39;provisioning&#39;</span><span class="p">)</span>
+        <span class="n">log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Provisioning OpenStack instance (</span><span class="si">%s</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">instance_id</span><span class="p">)</span>
+
+        <span class="n">ports_str</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;exposed_ports&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">ports_str</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">parse_ports_string</span><span class="p">(</span><span class="n">ports_str</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="n">error</span> <span class="o">=</span> <span class="s1">&#39;Incorrect exposed ports definition in blueprint&#39;</span>
+                <span class="n">error_body</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="n">Instance</span><span class="o">.</span><span class="n">STATE_FAILED</span><span class="p">,</span> <span class="s1">&#39;error_msg&#39;</span><span class="p">:</span> <span class="n">error</span><span class="p">}</span>
+                <span class="n">pbclient</span><span class="o">.</span><span class="n">do_instance_patch</span><span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="n">error_body</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>
+
+        <span class="c1"># fetch user public key</span>
+        <span class="n">key_data</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_user_key_data</span><span class="p">(</span><span class="n">instance_user</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">key_data</span><span class="p">:</span>
+            <span class="n">error</span> <span class="o">=</span> <span class="s1">&#39;user</span><span class="se">\&#39;</span><span class="s1">s public key is missing&#39;</span>
+            <span class="n">error_body</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="n">Instance</span><span class="o">.</span><span class="n">STATE_FAILED</span><span class="p">,</span> <span class="s1">&#39;error_msg&#39;</span><span class="p">:</span> <span class="n">error</span><span class="p">}</span>
+            <span class="n">pbclient</span><span class="o">.</span><span class="n">do_instance_patch</span><span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="n">error_body</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>
+
+        <span class="n">oss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_oss</span><span class="p">()</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="n">oss</span><span class="o">.</span><span class="n">provision_instance</span><span class="p">(</span>
+            <span class="n">instance_name</span><span class="p">,</span>
+            <span class="n">config</span><span class="p">[</span><span class="s1">&#39;image&#39;</span><span class="p">],</span>
+            <span class="n">config</span><span class="p">[</span><span class="s1">&#39;flavor&#39;</span><span class="p">],</span>
+            <span class="n">nics</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;openstack_net_id&#39;</span><span class="p">,</span> <span class="s1">&#39;auto&#39;</span><span class="p">),</span>
+            <span class="n">public_key</span><span class="o">=</span><span class="n">key_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;public_key&#39;</span><span class="p">],</span>
+            <span class="n">userdata</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;userdata&#39;</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="s1">&#39;error&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">log_uploader</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s1">&#39;Provisioning failed </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">])</span>
+            <span class="k">return</span>
+
+        <span class="n">ip</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;address_data&#39;</span><span class="p">][</span><span class="s1">&#39;public_ip&#39;</span><span class="p">]</span>
+        <span class="n">instance_data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;server_id&#39;</span><span class="p">:</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;server_id&#39;</span><span class="p">],</span>
+            <span class="s1">&#39;floating_ip&#39;</span><span class="p">:</span> <span class="n">ip</span><span class="p">,</span>
+            <span class="s1">&#39;allocated_from_pool&#39;</span><span class="p">:</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;address_data&#39;</span><span class="p">][</span><span class="s1">&#39;allocated_from_pool&#39;</span><span class="p">],</span>
+            <span class="s1">&#39;security_group_id&#39;</span><span class="p">:</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;security_group&#39;</span><span class="p">],</span>
+            <span class="s1">&#39;endpoints&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;SSH&#39;</span><span class="p">,</span> <span class="s1">&#39;access&#39;</span><span class="p">:</span> <span class="s1">&#39;ssh cloud-user@</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">ip</span><span class="p">},</span>
+            <span class="p">]</span>
+        <span class="p">}</span>
+        <span class="n">log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Publishing server data</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">pbclient</span><span class="o">.</span><span class="n">do_instance_patch</span><span class="p">(</span>
+            <span class="n">instance_id</span><span class="p">,</span>
+            <span class="p">{</span><span class="s1">&#39;instance_data&#39;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">instance_data</span><span class="p">),</span> <span class="s1">&#39;public_ip&#39;</span><span class="p">:</span> <span class="n">ip</span><span class="p">})</span>
+        <span class="n">log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Provisioning complete</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">do_deprovision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="n">log_uploader</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_prov_log_uploader</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">,</span> <span class="n">log_type</span><span class="o">=</span><span class="s1">&#39;deprovisioning&#39;</span><span class="p">)</span>
+        <span class="n">log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Deprovisioning instance </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">instance_id</span><span class="p">)</span>
+        <span class="n">pbclient</span> <span class="o">=</span> <span class="n">PBClient</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;INTERNAL_API_BASE_URL&#39;</span><span class="p">],</span> <span class="n">ssl_verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">oss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_oss</span><span class="p">()</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_instance_description</span><span class="p">(</span><span class="n">instance_id</span><span class="p">)</span>
+        <span class="n">instance_data</span> <span class="o">=</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;instance_data&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s1">&#39;server_id&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">instance_data</span><span class="p">:</span>
+            <span class="n">log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Skipping, no server id in instance data&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="n">server_id</span> <span class="o">=</span> <span class="n">instance_data</span><span class="p">[</span><span class="s1">&#39;server_id&#39;</span><span class="p">]</span>
+
+        <span class="n">log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Destroying server instance . . &quot;</span><span class="p">)</span>
+        <span class="n">oss</span><span class="o">.</span><span class="n">deprovision_instance</span><span class="p">(</span><span class="n">server_id</span><span class="p">)</span>
+        <span class="n">log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Deprovisioning ready</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">do_housekeep</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>System Overview &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="system-overview">
+<h1>System Overview<a class="headerlink" href="#system-overview" title="Permalink to this headline">¶</a></h1>
+<p>Pebbles is configured as a number of containers, depicted as grey boxes. Most
+containers are isolated from each other and only talk the artefact/module
+above or below them in the graph.</p>
+<img src="_images/graphviz-d7dc095c375b58423d65d09c05a1a3bf8d60d9f5.png" alt="digraph G {
+        node [color=blue shape=box style=filled fillcolor=white];
+        color=black;
+        edge [arrowhead=none];
+        subgraph cluster_frontend{
+                bgcolor=&quot;gray&quot;;
+                nginx [shape=diamond color=red];
+                label = &quot;Frontend&quot;;
+                }
+        subgraph cluster_API {
+                bgcolor=&quot;gray&quot;;
+                gunicorn-&gt;flask_backend;
+                gunicorn [shape=diamond color=red];
+                flask_backend [label=&quot;Flask Backend&quot;];
+                
+                label = &quot;API&quot;;
+                }
+        subgraph cluster_redis {
+                bgcolor=&quot;gray&quot;;
+                flask_backend -&gt; redis; 
+                redis [shape=diamond color=red];
+                label = &quot;Redis&quot;;
+                }
+        subgraph cluster_worker {
+                bgcolor=&quot;gray&quot;;
+                redis-&gt;worker_; 
+                worker_ [label=&quot;Celery Worker&quot;];
+                label = &quot;Worker&quot;;
+                }
+        subgraph cluster_sql {
+                bgcolor=&quot;gray&quot;;
+                // cylinder shape is in devel but not in mainstream
+                PostgreSQL [shape=diamond color=red]; 
+                label = &quot;DB&quot;;
+                }
+        subgraph cluster_SSO {
+                bgcolor=&quot;gray&quot;;
+                shibboleth;
+                label = &quot;SSO\n(optional)&quot;;
+        }
+
+        flask_backend-&gt;PostgreSQL;
+        nginx-&gt;gunicorn;
+        edge [weight=0 color=darkgreen arrowhead=none];
+        nginx-&gt;worker_ [label=&quot;proxy configuration directives&quot;];
+        worker_-&gt;flask_backend [label=&quot;provision logging&quot;];
+        nginx-&gt;redis [label=&quot;proxy config updates&quot;];
+        edge [weight=0 color=darkgreen arrowhead=none, style=dotted];
+        nginx-&gt;shibboleth;
+        shibboleth-&gt;gunicorn;
+}" />
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/system_architecture.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/system_architecture.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

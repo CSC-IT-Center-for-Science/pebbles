@@ -1,0 +1,159 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Admin guide &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="admin-guide">
+<h1>Admin guide<a class="headerlink" href="#admin-guide" title="Permalink to this headline">¶</a></h1>
+<p>This guide is aimed at administrators and developers, as we don&#8217;t have a
+separate dev guide at the moment. Developers are expected to also be able to
+admin the system.</p>
+<p>Contents:</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="system_architecture.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="how_to_install_on_cpouta.html">How to launch Pebbles server on cPouta</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="how_to_install_on_cpouta.html#part-1-launch-the-server">Part 1: Launch the server</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_to_install_on_cpouta.html#part-2-install-software">Part 2: Install software</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_to_install_on_cpouta.html#part-3-quick-start-using-the-software">Part 3: Quick start using the software</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_to_install_on_cpouta.html#part-4-open-access-to-users">Part 4: Open access to users</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_to_install_on_cpouta.html#part-5-administrative-tasks-and-troubleshooting">Part 5: Administrative tasks and troubleshooting</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="how_to_deploy_on_openshift.html">How to launch a Pebbles service on Rahti</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="how_to_deploy_on_openshift.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_to_deploy_on_openshift.html#deployment">Deployment</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="database_migrations.html">Database Migrations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="database_migrations.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="database_migrations.html#process">Process</a></li>
+<li class="toctree-l2"><a class="reference internal" href="database_migrations.html#notes">Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="configuring.html">Configurations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="configuring.html#baseconfig">BaseConfig</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="drivers.html">Drivers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="drivers.html#module-pebbles.drivers.provisioning">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drivers.html#module-pebbles.drivers.provisioning.base_driver">Base Driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drivers.html#module-pebbles.drivers.provisioning.openstack_driver">OpenStack Driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drivers.html#module-pebbles.drivers.provisioning.docker_driver">Docker Driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drivers.html#module-pebbles.drivers.provisioning.openshift_driver">OpenShift Driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drivers.html#dummy-driver">Dummy Driver</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pouta_image_openstackdriver.html">cPouta virtual machines in Pebbles</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pouta_image_openstackdriver.html#using-an-existing-cpouta-image">Using an existing cPouta image</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pouta_image_openstackdriver.html#creating-your-own-cpouta-images-for-pebbles">Creating your own cPouta images for Pebbles</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="README_docker_driver.html">DockerDriver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="README_docker_driver.html#getting-started">Getting started</a></li>
+<li class="toctree-l2"><a class="reference internal" href="README_docker_driver.html#create-a-test-blueprint">Create a test blueprint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="README_docker_driver.html#shutting-down-the-server">Shutting down the server</a></li>
+<li class="toctree-l2"><a class="reference internal" href="README_docker_driver.html#custom-blueprints">Custom blueprints</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dev_environment.html">Devevelopment environment</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html#which-development-set-up">Which development set-up?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html#vagrant-set-up">Vagrant set-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html#local-set-up">Local set-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html#selenium-tests">Selenium tests</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="documenting.html">Documenting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="monitoring.html">Monitoring</a></li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/admin_guide.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/admin_guide.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Simple persistence in GitHub &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="simple-persistence-in-github">
+<h1>Simple persistence in GitHub<a class="headerlink" href="#simple-persistence-in-github" title="Permalink to this headline">¶</a></h1>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">All data in Pebbles should be considered ephemeral.</p>
+</div>
+<p>In the future we have plans to offer medium-term storage between container
+stops and starts but currently that is still in development. This means that
+each user is responsible for their own persistence solution.</p>
+<p><a class="reference external" href="https://github.io/">Github</a> is a popular service offering <a class="reference external" href="http://git-scm.org/">Git</a> version control for free for open source projects.
+There are many alternatives such as <a class="reference external" href="https://about.gitlab.com/">GitLab</a>,
+which can be hosted on your own systems  in case GitHub is not suitable for
+your use case.</p>
+<ol class="arabic simple">
+<li>To start using GitHub <a class="reference external" href="https://github.com/join">create an account</a>.</li>
+<li>After that optionally
+<a class="reference external" href="https://help.github.com/articles/creating-a-new-repository/">create a new repository</a>
+or use an existing one</li>
+<li>It is recommended that you enable <a class="reference external" href="https://help.github.com/articles/about-two-factor-authentication/">2FA Authentication</a></li>
+<li>If you enabled 2FA authentication you&#8217;ll need to <a class="reference external" href="https://help.github.com/articles/creating-an-access-token-for-command-line-use/">create an access token</a>. Store this
+token in a safe place as you won&#8217;t be able to see it again!</li>
+<li>Start a Jupyter/RStudio notebook</li>
+<li><dl class="first docutils">
+<dt>Use the HTTPS URL for cloning your repository</dt>
+<dd><ul class="first last">
+<li>when asked for password give your access token instead</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Commit files to git as you would</dt>
+<dd><ul class="first last">
+<li>you&#8217;ll need to access token to push to the remote repository</li>
+</ul>
+</dd>
+</dl>
+</li>
+</ol>
+<p>You may need to export this</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span><span class="nb">export</span> <span class="nv">GIT_COMMITTER_NAME</span><span class="o">=</span>username
+<span class="nb">export</span> <span class="nv">GIT_COMMITTER_EMAIL</span><span class="o">=</span>username@example.org
+</pre></div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/github_persistence.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/github_persistence.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

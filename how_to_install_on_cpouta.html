@@ -1,0 +1,474 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>How to launch Pebbles server on cPouta &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="how-to-launch-pebbles-server-on-cpouta">
+<h1>How to launch Pebbles server on cPouta<a class="headerlink" href="#how-to-launch-pebbles-server-on-cpouta" title="Permalink to this headline">¶</a></h1>
+<p>These are step by step instructions on how to launch a Pebbles server on
+cPouta IaaS cloud (<a class="reference external" href="https://research.csc.fi/pouta-iaas-cloud">https://research.csc.fi/pouta-iaas-cloud</a>). We assume that you are
+familiar with the cPouta service. Horizon web interface will be used as an example.</p>
+<p>First we create a security group, then launch a server and finally install the software
+using ssh interactive session.</p>
+<div class="section" id="part-1-launch-the-server">
+<h2>Part 1: Launch the server<a class="headerlink" href="#part-1-launch-the-server" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="prerequisites">
+<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>First log in to <a class="reference external" href="https://pouta.csc.fi">https://pouta.csc.fi</a></li>
+<li>Check that quota on the first page looks ok.</li>
+<li>Upload public key or create a key pair, if you have not done so already
+(Access and Security -&gt; Key Pairs)</li>
+</ul>
+</div>
+<div class="section" id="create-a-security-group-for-the-server">
+<h3>Create a security group for the server<a class="headerlink" href="#create-a-security-group-for-the-server" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>In case you are a member of multiple projects in cPouta, select the desired
+project in the project selection drop down box on the top of the page</li>
+<li>Create a security group called &#8216;pb_server&#8217; for the server (Access and
+Security -&gt; Create Security Group)</li>
+<li>Add ssh and https -access to your workstation IP/subnet (Manage rules -&gt; Add
+rule) * ssh: port 22, CIDR: your ip/32 (you can check your ip with e.g.
+<a class="reference external" href="http://www.whatismyip.com/">http://www.whatismyip.com/</a>) * https: port 443, CIDR: like above</li>
+<li>At this point keep the firewall as restricted as possible. Once the
+installation is complete, you can open the https-access to all your users.</li>
+</ul>
+</div>
+<div class="section" id="boot-the-server">
+<h3>Boot the server<a class="headerlink" href="#boot-the-server" title="Permalink to this headline">¶</a></h3>
+<p>We&#8217;ll next create the server VM. It will be based on CentOS-7.</p>
+<ul class="simple">
+<li>Go to (Instances -&gt; Launch Instance)</li>
+<li>Details tab:
+* Instance name: e.g. &#8216;pb_server&#8217;
+* Flavor: &#8216;standard.small&#8217;
+* Instance boot source: &#8216;boot from image&#8217;
+* Image: &#8216;CentOS-7&#8217;</li>
+<li>Access and security tab:
+* Key Pair: your keypair
+* Security Groups: unselect &#8216;default&#8217;, select &#8216;pb_server&#8217;</li>
+<li>Networks tab: default network is ok.</li>
+<li>Post-Creation and Advanced tabs can be skipped</li>
+</ul>
+</div>
+<div class="section" id="assign-a-public-ip">
+<h3>Assign a public IP<a class="headerlink" href="#assign-a-public-ip" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>Go to (Instances) and click More on pb_server instance row. Select &#8216;Associate floating IP&#8217;</li>
+<li>Select a free floating IP from the list and click &#8216;Associate&#8217;</li>
+<li>If there are no items in the list, allocate an address with (+).</li>
+</ul>
+</div>
+<div class="section" id="download-machine-to-machine-openstack-rc-file">
+<h3>Download machine to machine OpenStack RC -file<a class="headerlink" href="#download-machine-to-machine-openstack-rc-file" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>Log out and log in to <a class="reference external" href="https://pouta.csc.fi">https://pouta.csc.fi</a> again, this time using your
+machine to machine credentials</li>
+<li>Go to (Access and Security -&gt; API Access) and click &#8216;Download OpenStack RC
+File&#8217;. Save the file to a known location on your local computer</li>
+</ul>
+</div>
+</div>
+<div class="section" id="part-2-install-software">
+<h2>Part 2: Install software<a class="headerlink" href="#part-2-install-software" title="Permalink to this headline">¶</a></h2>
+<p>Open ssh connection to the server:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ ssh cloud-user@&lt;public ip of the server&gt;
+</pre></div>
+</div>
+<p>Update the server packages (we&#8217;ll boot it later):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ sudo yum update -y
+</pre></div>
+</div>
+<p>Clone the repository from GitHub:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ git clone https://github.com/CSCfi/pebbles.git
+</pre></div>
+</div>
+<p>Run the install script once - you will asked to log out and in again to make
+unix group changes effective. Here is a good time to reboot the server after
+the updates:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ ./pebbles/scripts/install_pb.bash
+$ sudo reboot
+</pre></div>
+</div>
+<p>Wait while for the server to reboot and copy the m2m OpenStack RC file to the server:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ scp path/to/your/saved/rc-file.bash cloud-user@&lt;public ip of the server&gt;
+</pre></div>
+</div>
+<p>SSH in again, source your m2m OpenStack credentials (use your m2m password
+when asked for) and continue installation:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ ssh cloud-user@&lt;public ip of the server&gt;
+$ source your-openrc.bash
+$ ./pebbles/scripts/install_pb.bash
+</pre></div>
+</div>
+</div>
+<div class="section" id="part-3-quick-start-using-the-software">
+<h2>Part 3: Quick start using the software<a class="headerlink" href="#part-3-quick-start-using-the-software" title="Permalink to this headline">¶</a></h2>
+<p>Here is list of tasks for a quick start.</p>
+<div class="section" id="set-admin-credentials">
+<h3>Set admin credentials<a class="headerlink" href="#set-admin-credentials" title="Permalink to this headline">¶</a></h3>
+<p>The installation script will print out initialization URL at the end of the
+installation. Navigate to that, set the admin credentials and log in as an
+admin. If you&#8217;re using the ansible script you won&#8217;t see the url, it is of the
+format <a class="reference external" href="https://pebbles.example.org/#/initialize">https://pebbles.example.org/#/initialize</a> .</p>
+</div>
+<div class="section" id="configure-essentials">
+<h3>Configure essentials<a class="headerlink" href="#configure-essentials" title="Permalink to this headline">¶</a></h3>
+<p>One should change at least the following settings</p>
+<dl class="class">
+<dt>
+<em class="property">class </em><code class="descclassname">pebbles.config.</code><code class="descname">BaseConfig</code><a class="reference internal" href="_modules/pebbles/config.html#BaseConfig"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Stores the default key, value pairs for the system configuration.
+Rendered with a decorator which considers any environment variables,
+then the system level config file and finally the default values,
+in that order of precedence.</p>
+<dl class="attribute">
+<dt>
+<code class="descname">BASE_URL</code></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt>
+<code class="descname">BRAND_IMAGE</code></dt>
+<dd><p>An image URL for branding the installation</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt>
+<code class="descname">MAIL_SERVER</code></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt>
+<code class="descname">MAIL_SUPPRESS_SEND</code></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt>
+<code class="descname">SENDER_EMAIL</code></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<p>See  <a class="reference internal" href="configuring.html#pebbles.config.BaseConfig" title="pebbles.config.BaseConfig"><code class="xref py py-class docutils literal"><span class="pre">pebbles.config.BaseConfig</span></code></a>  for all the options.</p>
+</div>
+<div class="section" id="enable-a-driver">
+<h3>Enable a driver<a class="headerlink" href="#enable-a-driver" title="Permalink to this headline">¶</a></h3>
+<p>By default, only a dummy test driver is enabled. To add more drivers for
+provisioning different resources, you need to edit the _PLUGIN_WHITELIST_
+variable. Change this variable to e.g.</p>
+<blockquote>
+<div>PLUGIN_WHITELIST: OpenStackDriver DummyDriver</div></blockquote>
+<p>The plugin infrastructure running in &#8216;worker&#8217; container will periodically
+check the plugin whitelist and upload driver configurations to the API server
+running in &#8216;api&#8217; container. In the case of OpenStackDriver, the configuration
+will dynamically include VM images and flavors that are available for the
+cPouta project.  Refresh the page after a minute or two, and the <em>Plugins</em>
+list on top of the page should include the driver of your choice.</p>
+</div>
+<div class="section" id="create-a-test-blueprint">
+<h3>Create a test blueprint<a class="headerlink" href="#create-a-test-blueprint" title="Permalink to this headline">¶</a></h3>
+<p>Click &#8216;Create Blueprint&#8217; next to OpenStackDriver in the plugin list and you
+are presented by a dialog for configuring the new blueprint. We&#8217;ll create a
+blueprint for Ubuntu-14.04 based VM, using standard.tiny flavor, running for
+1h maximum. We&#8217;ll also test running a custom command as part of the boot
+process and allow user to open ssh access to the instance from an arbitrary
+address</p>
+<ul class="simple">
+<li>Name: Ubuntu-14.04 test</li>
+<li>Description: Test blueprint for launching a single core Ubuntu-14.04 VM in cPouta</li>
+<li>Flavor: standard.tiny</li>
+<li>Maximum lifetime: 1h</li>
+<li>Maximum instances per user: 1</li>
+<li>Pre-allocate credits for the instance from the user quota: unchecked</li>
+<li>Cost multiplier: 0</li>
+<li>Remove the example Frontend firewall rule</li>
+<li>Allow user to request instance firewall to allow access to user&#8217;s IP address: check</li>
+</ul>
+<p>Also add a Customization script, just for test purposes:</p>
+<blockquote>
+<div>#!/bin/bash
+touch /tmp/hello_from_blueprint_config</div></blockquote>
+<p>Save the new blueprint and enable it in the Blueprints list.</p>
+</div>
+<div class="section" id="launch-a-test-instance">
+<h3>Launch a test instance<a class="headerlink" href="#launch-a-test-instance" title="Permalink to this headline">¶</a></h3>
+<p>Go to &#8216;Dashboard&#8217; tab. If you have not uploaded your ssh public key yet,
+you&#8217;ll see a notice with a link to do so in the Blueprint list. Click the link
+and upload or generate a public key.</p>
+<p>Go back to &#8216;Dashboard&#8217; and launch an instance. You&#8217;ll notice the new instance
+in the Instance list. Click on the instance name, that will take you to the
+detailed view, where you can see the provisioning logs and update access to
+your IP once the instance is up and running. Click on &#8216;Query client IP&#8217; to let
+the system take an educated guess of your IP and then &#8216;Change client IP&#8217;. Now
+the instance firewall is open to that given IP. Copy the ssh -command from the
+Access field above and paste that to a terminal (or an ssh-client):</p>
+<blockquote>
+<div>$ ssh <a class="reference external" href="mailto:cloud-user&#37;&#52;&#48;86&#46;50&#46;xxx&#46;xxx">cloud-user<span>&#64;</span>86<span>&#46;</span>50<span>&#46;</span>xxx<span>&#46;</span>xxx</a></div></blockquote>
+<p>Check if our boot time customization script worked:</p>
+<blockquote>
+<div>$ ls -l /tmp/hello_from_blueprint_config
+-rw-r&#8211;r&#8211; 1 root root 0 Nov 17 09:47 /tmp/hello_from_blueprint_config</div></blockquote>
+</div>
+<div class="section" id="enable-docker-driver">
+<h3>Enable Docker Driver<a class="headerlink" href="#enable-docker-driver" title="Permalink to this headline">¶</a></h3>
+<p>Enabling DockerDriver requires a bit more preparation, see <a class="reference external" href="http://cscfi.github.io/pebbles/README_docker_driver.html">Docker driver
+documentation</a></p>
+</div>
+<div class="section" id="enable-openshift-driver">
+<h3>Enable OpenShift Driver<a class="headerlink" href="#enable-openshift-driver" title="Permalink to this headline">¶</a></h3>
+<p>An OpenShift driver exists, but it&#8217;s documentation is still incomplete. ToDo:
+a list to the documentation when it is done.</p>
+</div>
+</div>
+<div class="section" id="part-4-open-access-to-users">
+<h2>Part 4: Open access to users<a class="headerlink" href="#part-4-open-access-to-users" title="Permalink to this headline">¶</a></h2>
+<p>Once you have set the admin credentials and checked that the system works, you
+can open the firewall to all the users.</p>
+<ul class="simple">
+<li>Go to pouta.csc.fi -&gt; Access and Security -&gt; Security Groups and select
+Manage Rules on &#8216;pb_server&#8217; group</li>
+<li>Open https -access either globally by selecting &#8216;Add rule&#8217; -&gt; port 443, CIDR
+0.0.0.0/0 or if the users of the system should always access it from a
+certain subnet, use that instead of 0.0.0.0/0</li>
+</ul>
+</div>
+<div class="section" id="part-5-administrative-tasks-and-troubleshooting">
+<h2>Part 5: Administrative tasks and troubleshooting<a class="headerlink" href="#part-5-administrative-tasks-and-troubleshooting" title="Permalink to this headline">¶</a></h2>
+<p># Notes on container based deployment</p>
+<p>The default installation with the provided script makes a Docker container
+based deployment. Since the system will have OpenStack credentials for the
+project it is serving and also be exposed to internet, we want to have an
+extra layer of isolation between http server and provisioning processes
+holding the credentials. The database (PosgreSQL) and message queue backend
+(Redis) also run in their own containers, using official vanilla images.</p>
+<p>The connections between containers are as follows:</p>
+<img src="_images/graphviz-d7dc095c375b58423d65d09c05a1a3bf8d60d9f5.png" alt="digraph G {
+        node [color=blue shape=box style=filled fillcolor=white];
+        color=black;
+        edge [arrowhead=none];
+        subgraph cluster_frontend{
+                bgcolor=&quot;gray&quot;;
+                nginx [shape=diamond color=red];
+                label = &quot;Frontend&quot;;
+                }
+        subgraph cluster_API {
+                bgcolor=&quot;gray&quot;;
+                gunicorn-&gt;flask_backend;
+                gunicorn [shape=diamond color=red];
+                flask_backend [label=&quot;Flask Backend&quot;];
+                
+                label = &quot;API&quot;;
+                }
+        subgraph cluster_redis {
+                bgcolor=&quot;gray&quot;;
+                flask_backend -&gt; redis; 
+                redis [shape=diamond color=red];
+                label = &quot;Redis&quot;;
+                }
+        subgraph cluster_worker {
+                bgcolor=&quot;gray&quot;;
+                redis-&gt;worker_; 
+                worker_ [label=&quot;Celery Worker&quot;];
+                label = &quot;Worker&quot;;
+                }
+        subgraph cluster_sql {
+                bgcolor=&quot;gray&quot;;
+                // cylinder shape is in devel but not in mainstream
+                PostgreSQL [shape=diamond color=red]; 
+                label = &quot;DB&quot;;
+                }
+        subgraph cluster_SSO {
+                bgcolor=&quot;gray&quot;;
+                shibboleth;
+                label = &quot;SSO\n(optional)&quot;;
+        }
+
+        flask_backend-&gt;PostgreSQL;
+        nginx-&gt;gunicorn;
+        edge [weight=0 color=darkgreen arrowhead=none];
+        nginx-&gt;worker_ [label=&quot;proxy configuration directives&quot;];
+        worker_-&gt;flask_backend [label=&quot;provision logging&quot;];
+        nginx-&gt;redis [label=&quot;proxy config updates&quot;];
+        edge [weight=0 color=darkgreen arrowhead=none, style=dotted];
+        nginx-&gt;shibboleth;
+        shibboleth-&gt;gunicorn;
+}" />
+<p>The containers are: api, worker, frontend, db and redis (plus possibly sso, if
+you enable shibboleth authentication).  You can list the status with:</p>
+<blockquote>
+<div>$ docker ps
+$ docker ps -a</div></blockquote>
+<p>Aliases are provided for an easy ssh access:</p>
+<blockquote>
+<div>$ ssh worker
+$ ssh api
+$ ssh frontend</div></blockquote>
+<p>The api, frontend and worker containers share the git repository that was
+checked out during installation through a read only shared folder. For other
+directories shared from the host, see the [Ansible play]
+(<a class="reference external" href="https://github.com/CSCfi/pebbles/blob/master/ansible/roles/single_server_with_docker/tasks/main.yml">https://github.com/CSCfi/pebbles/blob/master/ansible/roles/single_server_with_docker/tasks/main.yml</a>)
+that sets up the container infrastructure.</p>
+<p>To see the server process logs, take a look at /webapps/pebbles/logs
+-directory in the container:</p>
+<blockquote>
+<div>$ ssh api
+$ ls /webapps/pebbles/logs</div></blockquote>
+<p>You can also launch a tmux based status session, that will have windows open
+for the host and each of the containers and multiple panes showing status and
+logs in each window:</p>
+<blockquote>
+<div>$ pebbles/scripts/tmux_status.bash</div></blockquote>
+<p>Tmux is terminal multiplexer like screen. Here is a quick survival guide:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="38%" />
+<col width="62%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td>Action</td>
+<td>Command</td>
+</tr>
+<tr class="row-even"><td>navigate the views</td>
+<td>CTRL-b n</td>
+</tr>
+<tr class="row-odd"><td>change active pane</td>
+<td>CTRL-b arrow keys</td>
+</tr>
+<tr class="row-even"><td>exit/detach</td>
+<td>CTRL-b d</td>
+</tr>
+<tr class="row-odd"><td>new window</td>
+<td>CTRL-b c</td>
+</tr>
+<tr class="row-even"><td>attach</td>
+<td>$ tmux attach (or att)</td>
+</tr>
+<tr class="row-odd"><td>list sessions</td>
+<td>$ tmux list-sessions</td>
+</tr>
+<tr class="row-even"><td>kill a session</td>
+<td>$ tmux kill-session -t status</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">How to launch Pebbles server on cPouta</a><ul>
+<li><a class="reference internal" href="#part-1-launch-the-server">Part 1: Launch the server</a><ul>
+<li><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li><a class="reference internal" href="#create-a-security-group-for-the-server">Create a security group for the server</a></li>
+<li><a class="reference internal" href="#boot-the-server">Boot the server</a></li>
+<li><a class="reference internal" href="#assign-a-public-ip">Assign a public IP</a></li>
+<li><a class="reference internal" href="#download-machine-to-machine-openstack-rc-file">Download machine to machine OpenStack RC -file</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#part-2-install-software">Part 2: Install software</a></li>
+<li><a class="reference internal" href="#part-3-quick-start-using-the-software">Part 3: Quick start using the software</a><ul>
+<li><a class="reference internal" href="#set-admin-credentials">Set admin credentials</a></li>
+<li><a class="reference internal" href="#configure-essentials">Configure essentials</a></li>
+<li><a class="reference internal" href="#enable-a-driver">Enable a driver</a></li>
+<li><a class="reference internal" href="#create-a-test-blueprint">Create a test blueprint</a></li>
+<li><a class="reference internal" href="#launch-a-test-instance">Launch a test instance</a></li>
+<li><a class="reference internal" href="#enable-docker-driver">Enable Docker Driver</a></li>
+<li><a class="reference internal" href="#enable-openshift-driver">Enable OpenShift Driver</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#part-4-open-access-to-users">Part 4: Open access to users</a></li>
+<li><a class="reference internal" href="#part-5-administrative-tasks-and-troubleshooting">Part 5: Administrative tasks and troubleshooting</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/how_to_install_on_cpouta.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/how_to_install_on_cpouta.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

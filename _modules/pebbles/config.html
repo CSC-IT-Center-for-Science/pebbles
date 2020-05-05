@@ -1,0 +1,282 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>pebbles.config &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for pebbles.config</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Pebbles is configured with a number of **variables**.</span>
+
+<span class="sd">These variables come, in the order of precedence from</span>
+
+<span class="sd">- environment variables</span>
+<span class="sd">- a configuration file</span>
+<span class="sd">- built-in defaults</span>
+
+<span class="sd">Naming convention is `UPPERCASE_WORDS_WITH_UNDERSCORES`.</span>
+
+<span class="sd">To see the complete list check out pebbles.config that houses the object.</span>
+<span class="sd">Only some have been documented.</span>
+
+<span class="sd">The idea is that you could have a single docker container with multiple</span>
+<span class="sd">entry points. All containers can (or should) see the same configuration file</span>
+<span class="sd">and then at start-up time environment variables can be set to e.g.</span>
+<span class="sd">differentiate workers to run a particular driver.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">yaml</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+
+<span class="n">CONFIG_FILE</span> <span class="o">=</span> <span class="s1">&#39;/etc/pebbles/config.yaml&#39;</span>
+
+
+<span class="k">def</span> <span class="nf">_parse_env_value</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Pars environment variables to bool, integer or float or default to string.</span>
+
+<span class="sd">    :param val:</span>
+<span class="sd">    :return: val coerced into a type if it looks to be of one</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">val</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;false&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">elif</span> <span class="n">val</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;true&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">return</span> <span class="n">val</span>
+
+
+<span class="k">def</span> <span class="nf">resolve_configuration_value</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">get_key_from_config</span><span class="p">(</span><span class="n">config_file</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">config_file</span><span class="p">))</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+    <span class="c1"># check environment</span>
+    <span class="n">pb_key</span> <span class="o">=</span> <span class="s1">&#39;PB_&#39;</span> <span class="o">+</span> <span class="n">key</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">pb_key</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_parse_env_value</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="c1"># then finally check system config file and given default</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">CONFIG_FILE</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">get_key_from_config</span><span class="p">(</span><span class="n">CONFIG_FILE</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">value</span>
+
+    <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">default</span>
+
+
+<span class="k">def</span> <span class="nf">fields_to_properties</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">default</span> <span class="ow">in</span> <span class="nb">vars</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">default</span><span class="p">)</span> <span class="o">==</span> <span class="nb">tuple</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">default</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">default</span><span class="p">,</span> <span class="n">doc_</span> <span class="o">=</span> <span class="n">default</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">doc_</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">k</span><span class="o">.</span><span class="n">isupper</span><span class="p">():</span>
+            <span class="n">resolvef</span> <span class="o">=</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">resolve_configuration_value</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+            <span class="n">prop</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="n">resolvef</span><span class="p">,</span> <span class="n">doc</span><span class="o">=</span><span class="n">doc_</span><span class="p">)</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">prop</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">cls</span>
+
+
+<span class="c1"># each config can be documented by making the default value into a (value,</span>
+<span class="c1"># docstring) tuple</span>
+<span class="nd">@fields_to_properties</span>
+<div class="viewcode-block" id="BaseConfig"><a class="viewcode-back" href="../../how_to_install_on_cpouta.html#pebbles.config.BaseConfig">[docs]</a><span class="k">class</span> <span class="nc">BaseConfig</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Stores the default key, value pairs for the system configuration.</span>
+<span class="sd">        Rendered with a decorator which considers any environment variables,</span>
+<span class="sd">        then the system level config file and finally the default values,</span>
+<span class="sd">        in that order of precedence.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">DEBUG</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="kc">True</span><span class="p">,</span>
+        <span class="s1">&#39;Controls debug mode&#39;</span>
+    <span class="p">)</span>
+    <span class="n">SECRET_KEY</span> <span class="o">=</span> <span class="s1">&#39;change_me&#39;</span>
+    <span class="n">WTF_CSRF_ENABLED</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">SSL_VERIFY</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="c1"># SQLALCHEMY_DATABASE_URI = &#39;sqlite:////tmp/change_me.db&#39;</span>
+    <span class="n">SQLALCHEMY_DATABASE_URI</span> <span class="o">=</span> <span class="s1">&#39;postgresql://postgres:KskRu1V_qK1Z._ALGnh6nxFvhM288N2c@localhost/pebbles&#39;</span>
+    <span class="n">M2M_CREDENTIAL_STORE</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s1">&#39;/var/run/pebbles_m2m&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;Where to find the M2M credentials file&#39;</span>
+    <span class="p">)</span>
+    <span class="n">MESSAGE_QUEUE_URI</span> <span class="o">=</span> <span class="s1">&#39;redis://redis:6379/0&#39;</span>
+    <span class="n">INSTANCE_DATA_DIR</span> <span class="o">=</span> <span class="s1">&#39;/var/spool/pb_instances&#39;</span>
+    <span class="n">INTERNAL_API_BASE_URL</span> <span class="o">=</span> <span class="s1">&#39;https://api:1443/api/v1&#39;</span>
+    <span class="n">PUBLIC_IPV4</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s1">&#39;127.0.0.1&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;used by Docker Driver to create access urls&#39;</span>
+        <span class="s1">&#39; so FQDN is actually expected in production&#39;</span>
+    <span class="p">)</span>
+    <span class="n">BASE_URL</span> <span class="o">=</span> <span class="s1">&#39;https://localhost:8888&#39;</span>
+    <span class="n">MAX_CONTENT_LENGTH</span> <span class="o">=</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span>
+    <span class="c1"># ToDo: what uses the below? -jyrsa 2016-11-28</span>
+    <span class="n">FAKE_PROVISIONING</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">SENDER_EMAIL</span> <span class="o">=</span> <span class="s1">&#39;sender@example.org&#39;</span>
+    <span class="n">MAIL_SERVER</span> <span class="o">=</span> <span class="s1">&#39;smtp.example.org&#39;</span>
+    <span class="n">MAIL_SUPPRESS_SEND</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">MAIL_USE_TLS</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">SKIP_TASK_QUEUE</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">WRITE_PROVISIONING_LOGS</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">INSTANCE_NAME_PREFIX</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s1">&#39;pb-&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;all spawned instance names will have this prefix&#39;</span>
+    <span class="p">)</span>
+    <span class="n">DEFAULT_QUOTA</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="n">ENABLE_SHIBBOLETH_LOGIN</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">INSTALLATION_NAME</span> <span class="o">=</span> <span class="s1">&#39;Pebbles&#39;</span>
+    <span class="n">INSTALLATION_DESCRIPTION</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;A tool for provisioning &#39;</span>
+                                <span class="s1">&#39;ephemeral private cloud resources.&#39;</span><span class="p">)</span>
+    <span class="n">SHORT_DESCRIPTION</span> <span class="o">=</span> <span class="s1">&#39;Welcome to Notebooks&#39;</span>
+    <span class="n">BRAND_IMAGE</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s1">&#39;img/Notebooks_neg300px.png&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;An image URL for branding the installation&#39;</span>
+    <span class="p">)</span>
+    <span class="n">COURSE_REQUEST_FORM</span> <span class="o">=</span> <span class="s1">&#39;http://link-to-form&#39;</span>
+    <span class="n">HAKA_INSTITUTION_LIST</span> <span class="o">=</span> <span class="p">({},</span> <span class="s1">&#39;Dictionary of institution types and corresponding domains&#39;</span><span class="p">)</span>
+
+    <span class="n">PLUGIN_WHITELIST</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s1">&#39;DummyDriver&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;A whitespace-separated case-sensitive&#39;</span>
+        <span class="s1">&#39; list of all enabled plugins&#39;</span>
+    <span class="p">)</span>
+
+    <span class="n">PRESERVE_CONTEXT_ON_EXCEPTION</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="n">EXTERNAL_HTTPS_PORT</span> <span class="o">=</span> <span class="mi">443</span>
+
+    <span class="n">PROVISIONING_NUM_WORKERS</span> <span class="o">=</span> <span class="mi">1</span>
+
+    <span class="n">HAKA_LOGIN_AUTH_METHOD</span> <span class="o">=</span> <span class="s1">&#39;change_me&#39;</span>
+    <span class="n">CSC_LOGIN_AUTH_METHOD</span> <span class="o">=</span> <span class="s1">&#39;change_me&#39;</span>
+    <span class="n">VIRTU_LOGIN_AUTH_METHOD</span> <span class="o">=</span> <span class="s1">&#39;change_me&#39;</span>
+
+    <span class="c1"># enable access by []</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<span class="k">class</span> <span class="nc">TestConfig</span><span class="p">(</span><span class="n">BaseConfig</span><span class="p">):</span>
+    <span class="n">SQLALCHEMY_DATABASE_URI</span> <span class="o">=</span> <span class="s1">&#39;sqlite:///:memory:&#39;</span>
+    <span class="n">MAIL_SUPPRESS_SEND</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">FAKE_PROVISIONING</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">SKIP_TASK_QUEUE</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">BCRYPT_LOG_ROUNDS</span> <span class="o">=</span> <span class="mi">12</span>
+    <span class="n">WRITE_PROVISIONING_LOGS</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">TEST_MODE</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">INSTALLATION_NAME</span> <span class="o">=</span> <span class="s1">&#39;Pebbles&#39;</span>
+
+
+<span class="k">class</span> <span class="nc">LiveTestConfig</span><span class="p">(</span><span class="n">TestConfig</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Config for testing live. e.g. with Selenium.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Live testing setup spawns a subprocess for the live server so in-memory</span>
+    <span class="c1"># is not easily achievable.</span>
+    <span class="c1"># ToDo: we could use tempfile to create a temporary named file in __init__</span>
+    <span class="c1"># and close it in __del__. If we do it&#39;s important to log the location so</span>
+    <span class="c1"># that the tester can access the db manually.</span>
+    <span class="n">SQLALCHEMY_DATABASE_URI</span> <span class="o">=</span> <span class="s1">&#39;sqlite:////tmp/change_me.livetest.db&#39;</span>
+    <span class="n">PRESERVE_CONTEXT_ON_EXCEPTION</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="c1"># bit of culture never hurt anybody</span>
+    <span class="n">INSTALLATION_NAME</span> <span class="o">=</span> <span class="s1">&#39;Underworld Branding Iron&#39;</span>
+    <span class="n">INSTALLATION_DESCRIPTION</span> <span class="o">=</span> <span class="s1">&#39;Abandon all hope, ye who enter here.&#39;</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

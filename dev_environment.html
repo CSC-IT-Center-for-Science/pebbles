@@ -1,0 +1,158 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Devevelopment environment &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="devevelopment-environment">
+<h1>Devevelopment environment<a class="headerlink" href="#devevelopment-environment" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="which-development-set-up">
+<h2>Which development set-up?<a class="headerlink" href="#which-development-set-up" title="Permalink to this headline">¶</a></h2>
+<p>If in doubt choose Vagrant.</p>
+<p>If developing things that require database migrations, do a local set-up.</p>
+<p>For debugging use whichever suits your needs.</p>
+</div>
+<div class="section" id="vagrant-set-up">
+<h2>Vagrant set-up<a class="headerlink" href="#vagrant-set-up" title="Permalink to this headline">¶</a></h2>
+<p>Provided Vagrantfile can be used to start a new <strong>Pebbles</strong> instance
+(requires VirtualBox or Docker)</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>vagrant up
+</pre></div>
+</div>
+<p>or</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>vagrant up --provider<span class="o">=</span>docker
+</pre></div>
+</div>
+<p>After the installation the first admin user is created by using the
+initialization form at (<a class="reference external" href="https://localhost:8888/#/initialize">https://localhost:8888/#/initialize</a>). The development
+environment uses a self-signed certificate.</p>
+</div>
+<div class="section" id="local-set-up">
+<h2>Local set-up<a class="headerlink" href="#local-set-up" title="Permalink to this headline">¶</a></h2>
+<p>To set up a development environment you&#8217;ll obviously need python 2.7.x, with X
+preferably being the latest version. Py3 support pends on Py3 support in
+Ansible that parts of the system use internally.</p>
+<p>It&#8217;s a good idea to have a relatively new pip and possibly build essentials
+for your platform. Too old versions sometimes handle requirement resolution
+poorly.</p>
+<p>It&#8217;s recommended to use virtualenvwrapper.</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>$ <span class="nb">cd</span> pebbles
+$ mkvirtualenv pb
+<span class="o">(</span>pb<span class="o">)</span> $ pip install -r requirements.txt <span class="c1"># install requirement packages</span>
+<span class="o">(</span>pb<span class="o">)</span> $ python manage.py db upgrade <span class="c1"># create and upgrade db</span>
+<span class="o">(</span>pb<span class="o">)</span> $ python manage.py runserver
+</pre></div>
+</div>
+</div>
+<div class="section" id="selenium-tests">
+<h2>Selenium tests<a class="headerlink" href="#selenium-tests" title="Permalink to this headline">¶</a></h2>
+<p>There are some Selenium tests for integration and acceptance tests.</p>
+<p>Currently the only used driver is old Firefox native driver, which requires
+Firefox 45. To run the tests run.</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span><span class="o">(</span>pb<span class="o">)</span> $ python manage.py selenium
+</pre></div>
+</div>
+<p>Setting up a more complex setup using the Marionette, Chromedriver etc. is in
+the works. This requires that said artefacts be present. OTOH current approach
+requires a stale version of FF.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Devevelopment environment</a><ul>
+<li><a class="reference internal" href="#which-development-set-up">Which development set-up?</a></li>
+<li><a class="reference internal" href="#vagrant-set-up">Vagrant set-up</a></li>
+<li><a class="reference internal" href="#local-set-up">Local set-up</a></li>
+<li><a class="reference internal" href="#selenium-tests">Selenium tests</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/dev_environment.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/dev_environment.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

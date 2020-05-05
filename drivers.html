@@ -1,0 +1,295 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Drivers &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="drivers">
+<h1>Drivers<a class="headerlink" href="#drivers" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="module-pebbles.drivers.provisioning">
+<span id="overview"></span><h2>Overview<a class="headerlink" href="#module-pebbles.drivers.provisioning" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="provisioning-drivers">
+<h3>Provisioning drivers<a class="headerlink" href="#provisioning-drivers" title="Permalink to this headline">¶</a></h3>
+<p>Provisioning drivers are what makes PB tick. There are several for different
+backends. Currently it&#8217;s possible to:</p>
+<ul class="simple">
+<li>provision OpenStack virtual machines (OpenStackDriver)</li>
+<li>provision Docker containers from a host pool that consists of OpenStack
+virtual machines (DockerDriver)</li>
+<li>provision containers from OpenShift (OpenShiftDriver)</li>
+</ul>
+<p>The ones for DockerDriver are prepended DD_* . All drivers require the
+variable M2M_CREDENTIAL_STORE for credentials to OpenStack/OpenShift. The
+variable should point to a JSON file that contains</p>
+<p>For OpenStackDriver and DockerDriver</p>
+<ul class="simple">
+<li>OS_USERNAME</li>
+<li>OS_PASSWORD</li>
+<li>OS_TENANT_NAME</li>
+<li>OS_AUTH_URL</li>
+</ul>
+<p>To a v2 endpoint (v3 support will come eventually).</p>
+<p>For OpenShiftDriver:</p>
+<ul class="simple">
+<li>OSD_*_BASE_URL</li>
+<li>OSD_*_SUBDOMAIN</li>
+<li>OSD_*_USER</li>
+<li>OSD_*_PASSWORD</li>
+</ul>
+<p>Where * is the name of the OpenShift installation (the system can handle
+multiple openshifts).</p>
+<p>Drivers are implemented as plugins that are loaded dynamically by
+<code class="xref py py-mod docutils literal"><span class="pre">stevedore</span></code> .</p>
+</div>
+</div>
+<div class="section" id="module-pebbles.drivers.provisioning.base_driver">
+<span id="base-driver"></span><h2>Base Driver<a class="headerlink" href="#module-pebbles.drivers.provisioning.base_driver" title="Permalink to this headline">¶</a></h2>
+<p>Drivers abstract resource provisioning strategies to the system and user.</p>
+<p>A driver object can be instantiated to connect to some end point to CRUD
+resources like Docker containers or OpenStack virtual machines.</p>
+<dl class="class">
+<dt id="pebbles.drivers.provisioning.base_driver.ProvisioningDriverBase">
+<em class="property">class </em><code class="descclassname">pebbles.drivers.provisioning.base_driver.</code><code class="descname">ProvisioningDriverBase</code><span class="sig-paren">(</span><em>logger</em>, <em>config</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pebbles/drivers/provisioning/base_driver.html#ProvisioningDriverBase"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pebbles.drivers.provisioning.base_driver.ProvisioningDriverBase" title="Permalink to this definition">¶</a></dt>
+<dd><p>This class functions as the base for other classes.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-pebbles.drivers.provisioning.openstack_driver">
+<span id="openstack-driver"></span><h2>OpenStack Driver<a class="headerlink" href="#module-pebbles.drivers.provisioning.openstack_driver" title="Permalink to this headline">¶</a></h2>
+<p>ToDo: document OpenStack driver on user level here.</p>
+<dl class="class">
+<dt id="pebbles.drivers.provisioning.openstack_driver.OpenStackDriver">
+<em class="property">class </em><code class="descclassname">pebbles.drivers.provisioning.openstack_driver.</code><code class="descname">OpenStackDriver</code><span class="sig-paren">(</span><em>logger</em>, <em>config</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pebbles/drivers/provisioning/openstack_driver.html#OpenStackDriver"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pebbles.drivers.provisioning.openstack_driver.OpenStackDriver" title="Permalink to this definition">¶</a></dt>
+<dd><p>ToDo: document Openstack driver on developer/sysadmin level here.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-pebbles.drivers.provisioning.docker_driver">
+<span id="docker-driver"></span><h2>Docker Driver<a class="headerlink" href="#module-pebbles.drivers.provisioning.docker_driver" title="Permalink to this headline">¶</a></h2>
+<p>DockerDriver maintains a pool of hosts running Docker and starts containers on
+one host.</p>
+<p>For safety reasons and to avoid stuck situations the hosts expire after 4
+hours and are respawned after the last container on them has been removed.</p>
+<p>An important concept to DD are <strong>slots</strong>. A slot is roughly 512MB of memory
+and it is used to assign containers to <strong>pool hosts</strong>. A pool host has a
+number of slots and the driver won&#8217;t assign any more containers to a host that
+doesn&#8217;t have the slots for it.</p>
+<p>The system maintains a number of hosts to reach DD_FREE_SLOT_TARGET unless
+DD_SHUTDOWN_MODE is True, in which case it waits for all containers on a host
+to finish and then shuts down the host.</p>
+<p>DockerDriver configurations are available via the UI admin dashboard under
+&#8220;Driver Configs&#8221;.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="31%" />
+<col width="69%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td>Config</td>
+<td>Description</td>
+</tr>
+<tr class="row-even"><td>DD_FREE_SLOT_TARGET</td>
+<td>Number of &#8220;slots&#8221; the system should have available</td>
+</tr>
+<tr class="row-odd"><td>DD_HOST_DATA_VOLUME_DEVICE</td>
+<td>ToDo</td>
+</tr>
+<tr class="row-even"><td>DD_HOST_DATA_VOLUME_FACTOR</td>
+<td>ToDo</td>
+</tr>
+<tr class="row-odd"><td>DD_HOST_DATA_VOLUME_TYPE</td>
+<td>&nbsp;</td>
+</tr>
+<tr class="row-even"><td>DD_HOST_EXTRA_SGS</td>
+<td>Extra security groups (name) to add to the hosts.
+Note that security group must exist in tenant!</td>
+</tr>
+<tr class="row-odd"><td>DD_HOST_FLAVOR_NAME_LARGE</td>
+<td>OpenStack flavor of a large host.</td>
+</tr>
+<tr class="row-even"><td>DD_HOST_FLAVOR_NAME_SMALL</td>
+<td>OpenStack flavor of a small host.</td>
+</tr>
+<tr class="row-odd"><td>DD_HOST_FLAVOR_SLOTS_LARGE</td>
+<td>How many slots a large instance provides</td>
+</tr>
+<tr class="row-even"><td>DD_HOST_FLAVOR_SLOTS_SMALL</td>
+<td>How many slots a small instance provides</td>
+</tr>
+<tr class="row-odd"><td>DD_HOST_IMAGE</td>
+<td>The image a host should have</td>
+</tr>
+<tr class="row-even"><td>DD_HOST_MASTER_SG</td>
+<td>The security group that the pebbles instance is on.
+A security group rule is created to allow traffic from
+this security group to the pool host.</td>
+</tr>
+<tr class="row-odd"><td>DD_HOST_NETWORK</td>
+<td>UUID of the network to which the pool host should be added.
+Can be &#8220;auto&#8221; if there is only one network in a tenant.</td>
+</tr>
+<tr class="row-even"><td>DD_MAX_HOSTS</td>
+<td>Do not spawn more than this many hosts.</td>
+</tr>
+<tr class="row-odd"><td>DD_HOST_ROOT_VOLUME_SIZE</td>
+<td>How large a volume to create to the hosts</td>
+</tr>
+<tr class="row-even"><td>DD_SHUTDOWN_MODE</td>
+<td>Stop all hosts when they become free.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="module-pebbles.drivers.provisioning.openshift_driver">
+<span id="openshift-driver"></span><h2>OpenShift Driver<a class="headerlink" href="#module-pebbles.drivers.provisioning.openshift_driver" title="Permalink to this headline">¶</a></h2>
+<p>To set up the OpenShift driver you need</p>
+<ul class="simple">
+<li>a workin OpenShift instance</li>
+<li>a user in the OpenShift instance (a separate machine to machine account is
+recommended)</li>
+</ul>
+<p>1. Start by adding the url, username, password and subdomain in the creds
+file. names are &#8220;OSO_XXX_URL&#8221;, where XXX is the name of your installation
+(there can be multiple installations)
+2. Restart Pebbles
+3. Check out <a class="reference external" href="https://github.com/cscfi/notebook-images/">https://github.com/cscfi/notebook-images/</a>
+4. Log in as the M2M user using the <em>oc</em> command line utility
+5. run build_openshift.sh to build and publish images to the OpenShift Docker registry
+6. Enable OpenShiftDriver in the Admin UI</p>
+<dl class="class">
+<dt id="pebbles.drivers.provisioning.openshift_driver.OpenShiftDriver">
+<em class="property">class </em><code class="descclassname">pebbles.drivers.provisioning.openshift_driver.</code><code class="descname">OpenShiftDriver</code><span class="sig-paren">(</span><em>logger</em>, <em>config</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pebbles/drivers/provisioning/openshift_driver.html#OpenShiftDriver"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pebbles.drivers.provisioning.openshift_driver.OpenShiftDriver" title="Permalink to this definition">¶</a></dt>
+<dd><p>OpenShift Driver allows provisioning instances in an existing OpenShift cluster.
+It creates a project per user, identified by user eppn, and optionally a persistent
+volume claim (PVC) for user data.</p>
+<p>The driver needs credentials for the cluster. The credentials are placed in the same
+m2m creds file that OpenStack and Docker driver use. The keys are as follows:</p>
+<p>&#8220;OSD_[cluster_id]_BASE_URL&#8221;: &#8220;<a class="reference external" href="https://oso-cluster-api.example.org:8443">https://oso-cluster-api.example.org:8443</a>&#8221;,
+&#8220;OSD_[cluster_id]_SUBDOMAIN&#8221;: &#8220;oso-cluster.example.org&#8221;,
+&#8220;OSD_[cluster_id]_USER&#8221;: &#8220;pebbles-m2m-user&#8221;,
+&#8220;OSD_[cluster_id]_PASSWORD&#8221;: &#8220;sickritt&#8221;</p>
+<p>Replace [cluster_id] with a unique string to a cluster. When creating a blueprint template,
+refer to the cluster id in the configuration, key &#8216;openshift_cluster_id&#8217; .You can have multiple
+credentials configured in the creds file.</p>
+</dd></dl>
+
+<p>Instructions for building custom docker image is available at: <a class="reference external" href="https://github.com/csc-training/geocomputing/tree/master/rahti">https://github.com/csc-training/geocomputing/tree/master/rahti</a></p>
+</div>
+<div class="section" id="dummy-driver">
+<h2>Dummy Driver<a class="headerlink" href="#dummy-driver" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="pebbles.drivers.provisioning.dummy_driver.DummyDriver">
+<em class="property">class </em><code class="descclassname">pebbles.drivers.provisioning.dummy_driver.</code><code class="descname">DummyDriver</code><span class="sig-paren">(</span><em>logger</em>, <em>config</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pebbles/drivers/provisioning/dummy_driver.html#DummyDriver"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pebbles.drivers.provisioning.dummy_driver.DummyDriver" title="Permalink to this definition">¶</a></dt>
+<dd><p>Dummy driver mostly pretends to be a real driver for system testing
+and development purposes.</p>
+<p>It runs a time-consuming process (ping) using run_logged_process, writes the public SSH
+key to the user for the user to a file and logs from the ping to the right places.
+It reports a random IP address.</p>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Drivers</a><ul>
+<li><a class="reference internal" href="#module-pebbles.drivers.provisioning">Overview</a><ul>
+<li><a class="reference internal" href="#provisioning-drivers">Provisioning drivers</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-pebbles.drivers.provisioning.base_driver">Base Driver</a></li>
+<li><a class="reference internal" href="#module-pebbles.drivers.provisioning.openstack_driver">OpenStack Driver</a></li>
+<li><a class="reference internal" href="#module-pebbles.drivers.provisioning.docker_driver">Docker Driver</a></li>
+<li><a class="reference internal" href="#module-pebbles.drivers.provisioning.openshift_driver">OpenShift Driver</a></li>
+<li><a class="reference internal" href="#dummy-driver">Dummy Driver</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/drivers.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/drivers.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

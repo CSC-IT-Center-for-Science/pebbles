@@ -1,0 +1,977 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>pebbles.drivers.provisioning.openshift_driver &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="../../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../../',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for pebbles.drivers.provisioning.openshift_driver</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">To set up the OpenShift driver you need</span>
+
+<span class="sd">* a workin OpenShift instance</span>
+<span class="sd">* a user in the OpenShift instance (a separate machine to machine account is</span>
+<span class="sd">  recommended)</span>
+
+<span class="sd">1. Start by adding the url, username, password and subdomain in the creds</span>
+<span class="sd">file. names are &quot;OSO_XXX_URL&quot;, where XXX is the name of your installation</span>
+<span class="sd">(there can be multiple installations)</span>
+<span class="sd">2. Restart Pebbles</span>
+<span class="sd">3. Check out https://github.com/cscfi/notebook-images/</span>
+<span class="sd">4. Log in as the M2M user using the *oc* command line utility</span>
+<span class="sd">5. run build_openshift.sh to build and publish images to the OpenShift Docker registry</span>
+<span class="sd">6. Enable OpenShiftDriver in the Admin UI</span>
+
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">uuid</span>
+<span class="kn">from</span> <span class="nn">pprint</span> <span class="k">import</span> <span class="n">pprint</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+<span class="c1"># noinspection PyUnresolvedReferences</span>
+<span class="kn">from</span> <span class="nn">six.moves.urllib.parse</span> <span class="k">import</span> <span class="n">urlparse</span><span class="p">,</span> <span class="n">parse_qs</span>
+
+<span class="kn">from</span> <span class="nn">pebbles.client</span> <span class="k">import</span> <span class="n">PBClient</span>
+<span class="kn">from</span> <span class="nn">pebbles.drivers.provisioning</span> <span class="k">import</span> <span class="n">base_driver</span>
+<span class="kn">from</span> <span class="nn">pebbles.utils</span> <span class="k">import</span> <span class="n">parse_maximum_lifetime</span>
+
+<span class="c1"># maximum time to wait for pod creation before failing</span>
+<span class="n">MAX_POD_SPAWN_WAIT_TIME_SEC</span> <span class="o">=</span> <span class="mi">900</span>
+<span class="c1"># maximum time to wait for pod (down) scaling</span>
+<span class="n">MAX_POD_SCALE_WAIT_TIME_SEC</span> <span class="o">=</span> <span class="mi">120</span>
+<span class="c1"># refresh the token if it is this close to expiration</span>
+<span class="n">TOKEN_REFRESH_DELTA</span> <span class="o">=</span> <span class="mi">600</span>
+
+
+<span class="k">class</span> <span class="nc">OpenShiftClient</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    An abstraction of accessing an OpenShift cluster</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">base_url</span><span class="p">,</span> <span class="n">subdomain</span><span class="p">,</span> <span class="n">user</span><span class="p">,</span> <span class="n">password</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Constructor</span>
+
+<span class="sd">        :param base_url: url to access the api, like https://oso.example.org:8443/</span>
+<span class="sd">        :param subdomain: the subdomain for creating the routes, like osoapps.example.org</span>
+<span class="sd">        :param user:</span>
+<span class="sd">        :param password:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">base_url</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;/&#39;</span><span class="p">:</span>
+            <span class="n">base_url</span> <span class="o">=</span> <span class="n">base_url</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">base_url</span> <span class="o">=</span> <span class="n">base_url</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">subdomain</span> <span class="o">=</span> <span class="n">subdomain</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">oapi_base_url</span> <span class="o">=</span> <span class="n">base_url</span> <span class="o">+</span> <span class="s1">&#39;/oapi/v1&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kube_base_url</span> <span class="o">=</span> <span class="n">base_url</span> <span class="o">+</span> <span class="s1">&#39;/api/v1&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">template_base_url</span> <span class="o">=</span> <span class="n">base_url</span> <span class="o">+</span> <span class="s1">&#39;/apis/template.openshift.io/v1&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">user</span> <span class="o">=</span> <span class="n">user</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">password</span> <span class="o">=</span> <span class="n">password</span>
+
+        <span class="c1"># token_data caches the token to access the API. See _request_token() for details.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">token_data</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">session</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">make_base_kube_object</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">kind</span><span class="o">=</span><span class="n">kind</span><span class="p">,</span>
+            <span class="n">apiVersion</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span>
+            <span class="n">metadata</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">name</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">print_response</span><span class="p">(</span><span class="n">resp</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">resp</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;success: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">resp</span><span class="o">.</span><span class="n">status_code</span><span class="p">)</span>
+            <span class="n">pprint</span><span class="p">(</span><span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;error in response: </span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">resp</span><span class="o">.</span><span class="n">status_code</span><span class="p">,</span> <span class="n">resp</span><span class="o">.</span><span class="n">reason</span><span class="p">,</span> <span class="n">resp</span><span class="o">.</span><span class="n">text</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_request_token</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">current_ts</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Requests an access token for the cluster</span>
+
+<span class="sd">        :param current_ts: current timestamp</span>
+<span class="sd">        :return: dict containing access_token, lifetime and expiry time</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_url</span> <span class="o">+</span> <span class="s1">&#39;/oauth/authorize&#39;</span>
+        <span class="n">auth_encoded</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="nb">bytes</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1">:</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">password</span><span class="p">)))</span>
+
+        <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;Authorization&#39;</span><span class="p">:</span> <span class="s1">&#39;Basic </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">auth_encoded</span><span class="p">),</span>
+            <span class="s1">&#39;X-Csrf-Token&#39;</span><span class="p">:</span> <span class="s1">&#39;1&#39;</span>
+        <span class="p">}</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;response_type&#39;</span><span class="p">:</span> <span class="s1">&#39;token&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;client_id&#39;</span><span class="p">:</span> <span class="s1">&#39;openshift-challenging-client&#39;</span>
+        <span class="p">}</span>
+
+        <span class="n">resp</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">,</span> <span class="n">allow_redirects</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="n">location</span> <span class="o">=</span> <span class="n">resp</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;location&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">current_ts</span><span class="p">:</span>
+            <span class="n">current_ts</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">())</span>
+
+        <span class="n">parsed_data</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">location</span><span class="p">)</span>
+        <span class="n">parsed_query</span> <span class="o">=</span> <span class="n">parse_qs</span><span class="p">(</span><span class="n">parsed_data</span><span class="o">.</span><span class="n">fragment</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;access_token&#39;</span><span class="p">:</span> <span class="n">parsed_query</span><span class="p">[</span><span class="s1">&#39;access_token&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+            <span class="s1">&#39;lifetime&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">parsed_query</span><span class="p">[</span><span class="s1">&#39;expires_in&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]),</span>
+            <span class="s1">&#39;expires_at&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">parsed_query</span><span class="p">[</span><span class="s1">&#39;expires_in&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="n">current_ts</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">_get_token</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">current_ts</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Caching version of _request_token</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">token_data</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">token_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request_token</span><span class="p">(</span><span class="n">current_ts</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">current_ts</span><span class="p">:</span>
+                <span class="n">current_ts</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">())</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">token_data</span><span class="p">[</span><span class="s1">&#39;expires_at&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="n">TOKEN_REFRESH_DELTA</span> <span class="o">&lt;</span> <span class="n">current_ts</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">token_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request_token</span><span class="p">(</span><span class="n">current_ts</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">token_data</span><span class="p">[</span><span class="s1">&#39;access_token&#39;</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_construct_object_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">api_type</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">object_kind</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">object_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">subop</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a url string for given object</span>
+<span class="sd">        :param kubeapi: whether plain k8s or oso api is used</span>
+<span class="sd">        :param namespace: namespace for the object</span>
+<span class="sd">        :param object_kind: type of the object</span>
+<span class="sd">        :param object_id: id of the object</span>
+<span class="sd">        :return: url string, like &#39;https://oso.example.org:8443/api/v1/my-project/pods/18hfgy1&#39;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">api_type</span> <span class="o">==</span> <span class="s1">&#39;kubeapi&#39;</span><span class="p">:</span>
+            <span class="n">url_components</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">kube_base_url</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">api_type</span> <span class="o">==</span> <span class="s1">&#39;template_oapi&#39;</span><span class="p">:</span>
+            <span class="n">url_components</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">template_base_url</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">url_components</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">oapi_base_url</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">namespace</span><span class="p">:</span>
+            <span class="n">url_components</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;namespaces&#39;</span><span class="p">)</span>
+            <span class="n">url_components</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">namespace</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">object_kind</span><span class="p">:</span>
+            <span class="n">url_components</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">object_kind</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">object_id</span><span class="p">:</span>
+            <span class="n">url_components</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">object_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">subop</span><span class="p">:</span>
+            <span class="n">url_components</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">subop</span><span class="p">)</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">url_components</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">url</span>
+
+    <span class="k">def</span> <span class="nf">make_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">api_type</span><span class="o">=</span><span class="s1">&#39;oapi&#39;</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">object_kind</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">object_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                     <span class="n">subop</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">raise_on_failure</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Makes a request to OpenShift API</span>
+
+<span class="sd">        :param method: GET, PUT, POST</span>
+<span class="sd">        :param kubeapi: whether plain k8s or oso api is used</span>
+<span class="sd">        :param verbose: debugging on</span>
+<span class="sd">        :param namespace: namespace for the object</span>
+<span class="sd">        :param object_kind: type of the object</span>
+<span class="sd">        :param object_id: id of the object</span>
+<span class="sd">        :param subop: if it&#39;s a suboperation eg. getting logs of an object</span>
+<span class="sd">        :param params: request parameters</span>
+<span class="sd">        :param data: request data</span>
+<span class="sd">        :param raise_on_failure: should we raise a RuntimeError on failure</span>
+<span class="sd">        :return: response object from requests session</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_object_url</span><span class="p">(</span><span class="n">api_type</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">object_kind</span><span class="p">,</span> <span class="n">object_id</span><span class="p">,</span> <span class="n">subop</span><span class="p">)</span>
+        <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;Authorization&#39;</span><span class="p">:</span> <span class="s1">&#39;Bearer </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_token</span><span class="p">()}</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">data</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">method</span> <span class="ow">or</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;POST&#39;</span><span class="p">:</span>
+                <span class="n">resp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;PUT&#39;</span><span class="p">:</span>
+                <span class="n">resp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;Do not know what to do with data and method </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">method</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">method</span> <span class="ow">and</span> <span class="n">method</span> <span class="o">!=</span> <span class="s1">&#39;GET&#39;</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;Do not know what to do with no data and method </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">method</span><span class="p">)</span>
+            <span class="n">resp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">print_response</span><span class="p">(</span><span class="n">resp</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">raise_on_failure</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">resp</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">resp</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">resp</span>
+
+    <span class="k">def</span> <span class="nf">make_delete_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">api_type</span><span class="o">=</span><span class="s1">&#39;oapi&#39;</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">object_kind</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">object_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                            <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">raise_on_failure</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Makes a delete request to OpenShift API</span>
+
+<span class="sd">        :param kubeapi: whether plain k8s or oso api is used</span>
+<span class="sd">        :param verbose: debugging on</span>
+<span class="sd">        :param namespace: namespace for the object</span>
+<span class="sd">        :param object_kind: type of the object</span>
+<span class="sd">        :param object_id: id of the object</span>
+<span class="sd">        :param raise_on_failure: should we raise a RuntimeError on failure</span>
+<span class="sd">        :return: response object from requests session</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_object_url</span><span class="p">(</span><span class="n">api_type</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">object_kind</span><span class="p">,</span> <span class="n">object_id</span><span class="p">)</span>
+        <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;Authorization&#39;</span><span class="p">:</span> <span class="s1">&#39;Bearer </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_token</span><span class="p">()}</span>
+
+        <span class="n">resp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">print_response</span><span class="p">(</span><span class="n">resp</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">raise_on_failure</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">resp</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">resp</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">resp</span>
+
+    <span class="k">def</span> <span class="nf">search_by_label</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">api_type</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">object_kind</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Performs a search by label(s)</span>
+
+<span class="sd">        :param kubeapi: k8s api instead of openshift</span>
+<span class="sd">        :param namespace:</span>
+<span class="sd">        :param object_kind:</span>
+<span class="sd">        :param params: a dict containing search criteria, like {&#39;labelSelector&#39;: &#39;app=my-app&#39;}</span>
+<span class="sd">        :return: search results as json</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span>
+            <span class="n">api_type</span><span class="o">=</span><span class="n">api_type</span><span class="p">,</span>
+            <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span><span class="p">,</span>
+            <span class="n">object_kind</span><span class="o">=</span><span class="n">object_kind</span><span class="p">,</span>
+            <span class="n">params</span><span class="o">=</span><span class="n">params</span>
+        <span class="p">)</span>
+        <span class="n">res_json</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">res_json</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;items&#39;</span><span class="p">,</span> <span class="p">[])</span>
+
+
+<span class="k">class</span> <span class="nc">OpenShiftDriverAccessProxy</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Abstraction layer for isolating driver from real world to enable mocking in unit tests</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">m2m_creds</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_m2m_creds</span> <span class="o">=</span> <span class="n">m2m_creds</span>
+
+    <span class="k">def</span> <span class="nf">get_openshift_client</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cluster_id</span><span class="p">):</span>
+        <span class="n">key_base</span> <span class="o">=</span> <span class="s1">&#39;OSD_</span><span class="si">%s</span><span class="s1">_&#39;</span> <span class="o">%</span> <span class="n">cluster_id</span>
+        <span class="k">return</span> <span class="n">OpenShiftClient</span><span class="p">(</span>
+            <span class="n">base_url</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_m2m_creds</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key_base</span> <span class="o">+</span> <span class="s1">&#39;BASE_URL&#39;</span><span class="p">),</span>
+            <span class="n">subdomain</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_m2m_creds</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key_base</span> <span class="o">+</span> <span class="s1">&#39;SUBDOMAIN&#39;</span><span class="p">),</span>
+            <span class="n">user</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_m2m_creds</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key_base</span> <span class="o">+</span> <span class="s1">&#39;USER&#39;</span><span class="p">),</span>
+            <span class="n">password</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_m2m_creds</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key_base</span> <span class="o">+</span> <span class="s1">&#39;PASSWORD&#39;</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_pb_client</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">api_base_url</span><span class="p">,</span> <span class="n">ssl_verify</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PBClient</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">api_base_url</span><span class="p">,</span> <span class="n">ssl_verify</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="OpenShiftDriver"><a class="viewcode-back" href="../../../../drivers.html#pebbles.drivers.provisioning.openshift_driver.OpenShiftDriver">[docs]</a><span class="k">class</span> <span class="nc">OpenShiftDriver</span><span class="p">(</span><span class="n">base_driver</span><span class="o">.</span><span class="n">ProvisioningDriverBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; OpenShift Driver allows provisioning instances in an existing OpenShift cluster.</span>
+<span class="sd">    It creates a project per user, identified by user eppn, and optionally a persistent</span>
+<span class="sd">    volume claim (PVC) for user data.</span>
+
+<span class="sd">    The driver needs credentials for the cluster. The credentials are placed in the same</span>
+<span class="sd">    m2m creds file that OpenStack and Docker driver use. The keys are as follows:</span>
+
+<span class="sd">    &quot;OSD_[cluster_id]_BASE_URL&quot;: &quot;https://oso-cluster-api.example.org:8443&quot;,</span>
+<span class="sd">    &quot;OSD_[cluster_id]_SUBDOMAIN&quot;: &quot;oso-cluster.example.org&quot;,</span>
+<span class="sd">    &quot;OSD_[cluster_id]_USER&quot;: &quot;pebbles-m2m-user&quot;,</span>
+<span class="sd">    &quot;OSD_[cluster_id]_PASSWORD&quot;: &quot;sickritt&quot;</span>
+
+<span class="sd">    Replace [cluster_id] with a unique string to a cluster. When creating a blueprint template,</span>
+<span class="sd">    refer to the cluster id in the configuration, key &#39;openshift_cluster_id&#39; .You can have multiple</span>
+<span class="sd">    credentials configured in the creds file.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">get_configuration</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">pebbles.drivers.provisioning.openshift_driver_config</span> <span class="k">import</span> <span class="n">CONFIG</span>
+
+        <span class="n">config</span> <span class="o">=</span> <span class="n">CONFIG</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">config</span>
+
+    <span class="k">def</span> <span class="nf">get_running_instance_logs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Get the logs of the openshift based instance which is in running state &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;getting container logs for instance id </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">instance_id</span><span class="p">)</span>
+
+        <span class="n">ap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_access_proxy</span><span class="p">()</span>
+        <span class="n">pbclient</span> <span class="o">=</span> <span class="n">ap</span><span class="o">.</span><span class="n">get_pb_client</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;INTERNAL_API_BASE_URL&#39;</span><span class="p">],</span> <span class="n">ssl_verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">running_log_uploader</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_prov_log_uploader</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">,</span> <span class="n">log_type</span><span class="o">=</span><span class="s1">&#39;running&#39;</span><span class="p">)</span>
+
+        <span class="n">instance</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_instance_description</span><span class="p">(</span><span class="n">instance_id</span><span class="p">)</span>
+
+        <span class="c1"># create openshift client by getting the cluster id from the blueprint config</span>
+        <span class="n">blueprint</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_blueprint_description</span><span class="p">(</span><span class="n">instance</span><span class="p">[</span><span class="s1">&#39;blueprint_id&#39;</span><span class="p">])</span>
+        <span class="n">blueprint_config</span> <span class="o">=</span> <span class="n">blueprint</span><span class="p">[</span><span class="s1">&#39;full_config&#39;</span><span class="p">]</span>
+        <span class="n">oc</span> <span class="o">=</span> <span class="n">ap</span><span class="o">.</span><span class="n">get_openshift_client</span><span class="p">(</span>
+            <span class="n">cluster_id</span><span class="o">=</span><span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;openshift_cluster_id&#39;</span><span class="p">],</span>
+        <span class="p">)</span>
+
+        <span class="n">instance_name</span> <span class="o">=</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+        <span class="n">project</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_project_name</span><span class="p">(</span><span class="n">instance</span><span class="p">)</span>
+
+        <span class="n">log_res</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span>
+            <span class="n">method</span><span class="o">=</span><span class="s1">&#39;GET&#39;</span><span class="p">,</span>
+            <span class="n">namespace</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
+            <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;deploymentconfigs&#39;</span><span class="p">,</span>
+            <span class="n">object_id</span><span class="o">=</span><span class="n">instance_name</span><span class="p">,</span>
+            <span class="n">subop</span><span class="o">=</span><span class="s1">&#39;log&#39;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">running_log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">log_res</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_access_proxy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_ap&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="n">m2m_creds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_m2m_credentials</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ap</span> <span class="o">=</span> <span class="n">OpenShiftDriverAccessProxy</span><span class="p">(</span><span class="n">m2m_creds</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ap</span>
+
+    <span class="k">def</span> <span class="nf">do_update_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;do_update_connectivity not implemented&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">do_provision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;do_provision </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">instance_id</span><span class="p">)</span>
+        <span class="n">log_uploader</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_prov_log_uploader</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">,</span> <span class="n">log_type</span><span class="o">=</span><span class="s1">&#39;provisioning&#39;</span><span class="p">)</span>
+
+        <span class="n">log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Provisioning OpenShift based instance (</span><span class="si">%s</span><span class="s1">)</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">instance_id</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_provision</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()))</span>
+
+    <span class="k">def</span> <span class="nf">_do_provision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">,</span> <span class="n">cur_ts</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Provisions a new instance on OpenShift.</span>
+
+<span class="sd">        :param token: token to access the API with</span>
+<span class="sd">        :param instance_id: instance that should be provisioned</span>
+<span class="sd">        :param cur_ts: current time</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_access_proxy</span><span class="p">()</span>
+
+        <span class="n">pbclient</span> <span class="o">=</span> <span class="n">ap</span><span class="o">.</span><span class="n">get_pb_client</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;INTERNAL_API_BASE_URL&#39;</span><span class="p">],</span> <span class="n">ssl_verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="n">log_uploader</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_prov_log_uploader</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">,</span> <span class="n">log_type</span><span class="o">=</span><span class="s1">&#39;provisioning&#39;</span><span class="p">)</span>
+
+        <span class="n">instance</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_instance_description</span><span class="p">(</span><span class="n">instance_id</span><span class="p">)</span>
+
+        <span class="c1"># fetch config</span>
+        <span class="n">blueprint</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_blueprint_description</span><span class="p">(</span><span class="n">instance</span><span class="p">[</span><span class="s1">&#39;blueprint_id&#39;</span><span class="p">])</span>
+        <span class="n">blueprint_config</span> <span class="o">=</span> <span class="n">blueprint</span><span class="p">[</span><span class="s1">&#39;full_config&#39;</span><span class="p">]</span>
+
+        <span class="n">instance_token</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="s1">&#39;auto_authentication&#39;</span> <span class="ow">in</span> <span class="n">blueprint_config</span> <span class="ow">and</span> <span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;auto_authentication&#39;</span><span class="p">]:</span>
+            <span class="n">instance_seconds</span> <span class="o">=</span> <span class="n">parse_maximum_lifetime</span><span class="p">(</span><span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;maximum_lifetime&#39;</span><span class="p">])</span>
+            <span class="n">instance_token</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">create_instance_token</span><span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="n">instance_seconds</span><span class="p">)</span>
+
+        <span class="c1"># get/generate a project name</span>
+        <span class="n">project_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_project_name</span><span class="p">(</span><span class="n">instance</span><span class="p">)</span>
+
+        <span class="c1"># create an openshift client based for selected cluster</span>
+        <span class="n">oc</span> <span class="o">=</span> <span class="n">ap</span><span class="o">.</span><span class="n">get_openshift_client</span><span class="p">(</span>
+            <span class="n">cluster_id</span><span class="o">=</span><span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;openshift_cluster_id&#39;</span><span class="p">],</span>
+        <span class="p">)</span>
+        <span class="c1"># create a dict out of space separated list of VAR=VAL entries</span>
+        <span class="n">env_var_array</span> <span class="o">=</span> <span class="n">blueprint_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;environment_vars&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+        <span class="n">env_vars</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;=&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">env_var_array</span><span class="p">]}</span>
+        <span class="n">env_vars</span><span class="p">[</span><span class="s1">&#39;INSTANCE_ID&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">instance_id</span>
+
+        <span class="c1"># merge the autodownload vars into environment</span>
+        <span class="k">for</span> <span class="n">var_suffix</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;url&#39;</span><span class="p">,</span> <span class="s1">&#39;filename&#39;</span><span class="p">):</span>
+            <span class="n">var</span> <span class="o">=</span> <span class="s1">&#39;autodownload_</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">var_suffix</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">blueprint_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
+                <span class="n">env_vars</span><span class="p">[</span><span class="n">var</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span> <span class="o">=</span> <span class="n">blueprint_config</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+
+        <span class="c1"># create a project and PVC if necessary and spawn a pod (through DC/RC), service and route</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_spawn_project_and_objects</span><span class="p">(</span>
+            <span class="n">oc</span><span class="o">=</span><span class="n">oc</span><span class="p">,</span>
+            <span class="n">project_name</span><span class="o">=</span><span class="n">project_name</span><span class="p">,</span>
+            <span class="n">blueprint_config</span><span class="o">=</span><span class="n">blueprint_config</span><span class="p">,</span>
+            <span class="n">instance</span><span class="o">=</span><span class="n">instance</span><span class="p">,</span>
+            <span class="n">environment_vars</span><span class="o">=</span><span class="n">env_vars</span>
+        <span class="p">)</span>
+
+        <span class="n">instance_data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;endpoints&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;https&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;access&#39;</span><span class="p">:</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;route&#39;</span><span class="p">]</span>
+                <span class="p">},</span>
+            <span class="p">],</span>
+            <span class="s1">&#39;project_name&#39;</span><span class="p">:</span> <span class="n">project_name</span><span class="p">,</span>
+            <span class="s1">&#39;spawn_ts&#39;</span><span class="p">:</span> <span class="n">cur_ts</span>
+        <span class="p">}</span>
+
+        <span class="c1"># if instance token is created, then append it along with instance id in the query string</span>
+        <span class="k">if</span> <span class="n">instance_token</span><span class="p">:</span>
+            <span class="n">endpoints</span> <span class="o">=</span> <span class="n">instance_data</span><span class="p">[</span><span class="s1">&#39;endpoints&#39;</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">endpoint_i</span> <span class="ow">in</span> <span class="n">endpoints</span><span class="p">:</span>
+                <span class="n">endpoint_i</span><span class="p">[</span><span class="s1">&#39;access&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="s1">&#39;?token=&#39;</span> <span class="o">+</span> <span class="n">instance_token</span> <span class="o">+</span> <span class="s1">&#39;&amp;instance_id=&#39;</span> <span class="o">+</span> <span class="n">instance_id</span>
+
+        <span class="k">if</span> <span class="s1">&#39;show_password&#39;</span> <span class="ow">in</span> <span class="n">blueprint_config</span> <span class="ow">and</span> <span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;show_password&#39;</span><span class="p">]:</span>
+            <span class="n">instance_data</span><span class="p">[</span><span class="s1">&#39;password&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">instance_id</span>
+
+        <span class="n">pbclient</span><span class="o">.</span><span class="n">do_instance_patch</span><span class="p">(</span>
+            <span class="n">instance_id</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;instance_data&#39;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">instance_data</span><span class="p">),</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+
+        <span class="n">log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;provisioning done for </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">instance_id</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_create_project</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">oc</span><span class="p">,</span> <span class="n">project_name</span><span class="p">):</span>
+
+        <span class="c1"># https://server:8443/oapi/v1/projectrequests</span>
+        <span class="n">project_data</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_base_kube_object</span><span class="p">(</span><span class="s1">&#39;ProjectRequest&#39;</span><span class="p">,</span> <span class="n">project_name</span><span class="p">)</span>
+
+        <span class="c1"># create the project if it does not exist yet</span>
+        <span class="kn">from</span> <span class="nn">time</span> <span class="k">import</span> <span class="n">sleep</span>
+        <span class="k">for</span> <span class="n">delay_count</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">30</span><span class="p">):</span>  <span class="c1"># sometimes the project isn&#39;t created and the code starts to create pvc</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span><span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;projects&#39;</span><span class="p">,</span> <span class="n">object_id</span><span class="o">=</span><span class="n">project_name</span><span class="p">,</span> <span class="n">raise_on_failure</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">res</span><span class="o">.</span><span class="n">ok</span> <span class="ow">and</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">403</span><span class="p">:</span>
+                <span class="n">oc</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span><span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;projectrequests&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">project_data</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">break</span>  <span class="c1"># project has been created, exit the loop</span>
+            <span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># sleep for 2 seconds, the loop goes on for 1 minute</span>
+
+    <span class="c1"># noinspection PyTypeChecker</span>
+    <span class="k">def</span> <span class="nf">_spawn_project_and_objects</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">oc</span><span class="p">,</span> <span class="n">project_name</span><span class="p">,</span> <span class="n">blueprint_config</span><span class="p">,</span> <span class="n">instance</span><span class="p">,</span> <span class="n">environment_vars</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates an OpenShift project (if needed) and launches a pod in it. If a volume mount point is requested,</span>
+<span class="sd">        a volume is allocated (if needed) and mounted to the pod. A secure route is also created.</span>
+
+<span class="sd">        :param oc: openshift client to use</span>
+<span class="sd">        :param project_name: namespace/project name</span>
+<span class="sd">        :param pod_name: pod name</span>
+<span class="sd">        :param pod_image: image to use for pod</span>
+<span class="sd">        :param port: the port to expose</span>
+<span class="sd">        :param pod_memory: amount of memory to reserve</span>
+<span class="sd">        :param volume_mount_point: where the persistent data should be mounted in the pod</span>
+<span class="sd">        :param environment_vars: environment vars to set in the pod</span>
+<span class="sd">        :return: dict with key &#39;route&#39; set to the provisioned route to the instance</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_create_project</span><span class="p">(</span><span class="n">oc</span><span class="p">,</span> <span class="n">project_name</span><span class="p">)</span>
+
+        <span class="n">pod_name</span> <span class="o">=</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+        <span class="n">pod_image</span> <span class="o">=</span> <span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;image&#39;</span><span class="p">]</span>
+        <span class="n">port</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;port&#39;</span><span class="p">])</span>
+        <span class="n">pod_memory</span> <span class="o">=</span> <span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;memory_limit&#39;</span><span class="p">]</span>
+        <span class="n">volume_mount_point</span> <span class="o">=</span> <span class="n">blueprint_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;volume_mount_point&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="c1"># create PVC if it does not exist yet</span>
+        <span class="k">if</span> <span class="n">volume_mount_point</span><span class="p">:</span>
+            <span class="n">pvc_data</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;apiVersion&#39;</span><span class="p">:</span> <span class="s1">&#39;v1&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;kind&#39;</span><span class="p">:</span> <span class="s1">&#39;PersistentVolumeClaim&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;metadata&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;pvc001&#39;</span>
+                <span class="p">},</span>
+                <span class="s1">&#39;spec&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;accessModes&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;ReadWriteMany&#39;</span><span class="p">],</span>
+                    <span class="s1">&#39;resources&#39;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s1">&#39;requests&#39;</span><span class="p">:</span> <span class="p">{</span>
+                            <span class="s1">&#39;storage&#39;</span><span class="p">:</span> <span class="s1">&#39;1Gi&#39;</span>
+                        <span class="p">}</span>
+                    <span class="p">},</span>
+                <span class="p">},</span>
+            <span class="p">}</span>
+            <span class="c1"># calling kubernetes API here</span>
+            <span class="c1"># https://server:8443/api/v1/namespaces/project/persistentvolumeclaims</span>
+
+            <span class="c1"># first check if we already have a PVC</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span>
+                <span class="n">namespace</span><span class="o">=</span><span class="n">project_name</span><span class="p">,</span>
+                <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;persistentvolumeclaims&#39;</span><span class="p">,</span>
+                <span class="n">object_id</span><span class="o">=</span><span class="n">pvc_data</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+                <span class="n">api_type</span><span class="o">=</span><span class="s1">&#39;kubeapi&#39;</span><span class="p">,</span>
+                <span class="n">raise_on_failure</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="c1"># nope, let&#39;s create it</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">res</span><span class="o">.</span><span class="n">ok</span> <span class="ow">and</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">404</span><span class="p">:</span>
+                <span class="n">oc</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span>
+                    <span class="n">namespace</span><span class="o">=</span><span class="n">project_name</span><span class="p">,</span>
+                    <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;persistentvolumeclaims&#39;</span><span class="p">,</span>
+                    <span class="n">data</span><span class="o">=</span><span class="n">pvc_data</span><span class="p">,</span>
+                    <span class="n">api_type</span><span class="o">=</span><span class="s1">&#39;kubeapi&#39;</span>
+                <span class="p">)</span>
+
+        <span class="c1"># https://server:8443/oapi/v1/namespaces/project/deploymentconfigs</span>
+        <span class="n">dc_data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;kind&#39;</span><span class="p">:</span> <span class="s1">&#39;DeploymentConfig&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;apiVersion&#39;</span><span class="p">:</span> <span class="s1">&#39;v1&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;metadata&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">pod_name</span><span class="p">,</span>
+                <span class="s1">&#39;creationTimestamp&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="s1">&#39;labels&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;run&#39;</span><span class="p">:</span> <span class="n">pod_name</span>
+                <span class="p">}</span>
+            <span class="p">},</span>
+            <span class="s1">&#39;spec&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;strategy&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;resources&#39;</span><span class="p">:</span> <span class="p">{}</span>
+                <span class="p">},</span>
+                <span class="s1">&#39;triggers&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="s1">&#39;replicas&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s1">&#39;test&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                <span class="s1">&#39;selector&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;run&#39;</span><span class="p">:</span> <span class="n">pod_name</span>
+                <span class="p">},</span>
+                <span class="s1">&#39;template&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;metadata&#39;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s1">&#39;creationTimestamp&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                        <span class="s1">&#39;labels&#39;</span><span class="p">:</span> <span class="p">{</span>
+                            <span class="s1">&#39;run&#39;</span><span class="p">:</span> <span class="n">pod_name</span>
+                        <span class="p">}</span>
+                    <span class="p">},</span>
+                    <span class="s1">&#39;spec&#39;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s1">&#39;containers&#39;</span><span class="p">:</span> <span class="p">[</span>
+                            <span class="p">{</span>
+                                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">pod_name</span><span class="p">,</span>
+                                <span class="s1">&#39;image&#39;</span><span class="p">:</span> <span class="n">pod_image</span><span class="p">,</span>
+                                <span class="s1">&#39;resources&#39;</span><span class="p">:</span> <span class="p">{</span>
+                                    <span class="s1">&#39;requests&#39;</span><span class="p">:</span> <span class="p">{</span>
+                                        <span class="s1">&#39;memory&#39;</span><span class="p">:</span> <span class="n">pod_memory</span>
+                                    <span class="p">},</span>
+                                    <span class="s1">&#39;limits&#39;</span><span class="p">:</span> <span class="p">{</span>
+                                        <span class="s1">&#39;memory&#39;</span><span class="p">:</span> <span class="n">pod_memory</span>
+                                    <span class="p">},</span>
+                                <span class="p">},</span>
+                                <span class="s1">&#39;ports&#39;</span><span class="p">:</span> <span class="p">[</span>
+                                    <span class="p">{</span>
+                                        <span class="s1">&#39;protocol&#39;</span><span class="p">:</span> <span class="s1">&#39;TCP&#39;</span><span class="p">,</span>
+                                        <span class="s1">&#39;containerPort&#39;</span><span class="p">:</span> <span class="n">port</span><span class="p">,</span>
+                                    <span class="p">}</span>
+                                <span class="p">],</span>
+                                <span class="s1">&#39;readinessProbe&#39;</span><span class="p">:</span> <span class="p">{</span>
+                                    <span class="s1">&#39;httpGet&#39;</span><span class="p">:</span> <span class="p">{</span>
+                                        <span class="s1">&#39;path&#39;</span><span class="p">:</span> <span class="s1">&#39;/&#39;</span><span class="p">,</span>
+                                        <span class="s1">&#39;port&#39;</span><span class="p">:</span> <span class="n">port</span><span class="p">,</span>
+                                        <span class="s1">&#39;scheme&#39;</span><span class="p">:</span> <span class="s1">&#39;HTTP&#39;</span><span class="p">,</span>
+
+                                    <span class="p">}</span>
+                                <span class="p">}</span>
+                            <span class="p">}</span>
+                        <span class="p">],</span>
+                    <span class="p">}</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+
+        <span class="n">dc_volume_mounts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">dc_volumes</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># workaround for service account secret automount.</span>
+        <span class="c1"># see https://github.com/kubernetes/kubernetes/issues/16779</span>
+        <span class="c1"># TODO revise this workaround</span>
+        <span class="n">dc_volume_mounts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;mountPath&#39;</span><span class="p">:</span> <span class="s1">&#39;/var/run/secrets/kubernetes.io/serviceaccount&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;nosecret&#39;</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+        <span class="n">dc_volumes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;nosecret&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;emptyDir&#39;</span><span class="p">:</span> <span class="p">{}</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+
+        <span class="c1"># add a mount point to persistent storage, if configured</span>
+        <span class="k">if</span> <span class="n">volume_mount_point</span><span class="p">:</span>
+            <span class="n">dc_volume_mounts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s1">&#39;mountPath&#39;</span><span class="p">:</span> <span class="n">volume_mount_point</span><span class="p">,</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;work&#39;</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+            <span class="n">dc_volumes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;work&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;persistentVolumeClaim&#39;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s1">&#39;claimName&#39;</span><span class="p">:</span> <span class="s1">&#39;pvc001&#39;</span>
+                    <span class="p">}</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="n">dc_data</span><span class="p">[</span><span class="s1">&#39;spec&#39;</span><span class="p">][</span><span class="s1">&#39;template&#39;</span><span class="p">][</span><span class="s1">&#39;spec&#39;</span><span class="p">][</span><span class="s1">&#39;containers&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;volumeMounts&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dc_volume_mounts</span>
+        <span class="n">dc_data</span><span class="p">[</span><span class="s1">&#39;spec&#39;</span><span class="p">][</span><span class="s1">&#39;template&#39;</span><span class="p">][</span><span class="s1">&#39;spec&#39;</span><span class="p">][</span><span class="s1">&#39;volumes&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dc_volumes</span>
+
+        <span class="c1"># create environment variables for the blueprint</span>
+        <span class="n">env_data</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">environment_vars</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">environment_vars</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">env_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">key</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">value</span><span class="p">})</span>
+
+        <span class="n">dc_data</span><span class="p">[</span><span class="s1">&#39;spec&#39;</span><span class="p">][</span><span class="s1">&#39;template&#39;</span><span class="p">][</span><span class="s1">&#39;spec&#39;</span><span class="p">][</span><span class="s1">&#39;containers&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;env&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">env_data</span>
+
+        <span class="n">oc</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span><span class="n">namespace</span><span class="o">=</span><span class="n">project_name</span><span class="p">,</span> <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;deploymentconfigs&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">dc_data</span><span class="p">)</span>
+
+        <span class="n">pod_selector_params</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">labelSelector</span><span class="o">=</span><span class="s1">&#39;run=</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">pod_name</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_wait_for_pod_creation</span><span class="p">(</span><span class="n">oc</span><span class="p">,</span> <span class="n">project_name</span><span class="p">,</span> <span class="n">pod_selector_params</span><span class="p">,</span> <span class="n">pod_name</span><span class="p">)</span>
+
+        <span class="c1"># calling kubernetes API here</span>
+        <span class="c1"># https://server:8443/api/v1/namespaces/project/services</span>
+        <span class="n">svc_data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;kind&#39;</span><span class="p">:</span> <span class="s1">&#39;Service&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;apiVersion&#39;</span><span class="p">:</span> <span class="s1">&#39;v1&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;metadata&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">pod_name</span><span class="p">,</span>
+                <span class="s1">&#39;labels&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;run&#39;</span><span class="p">:</span> <span class="n">pod_name</span>
+                <span class="p">}</span>
+            <span class="p">},</span>
+            <span class="s1">&#39;spec&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;ports&#39;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="s1">&#39;protocol&#39;</span><span class="p">:</span> <span class="s1">&#39;TCP&#39;</span><span class="p">,</span>
+                        <span class="s1">&#39;port&#39;</span><span class="p">:</span> <span class="n">port</span><span class="p">,</span>
+                        <span class="s1">&#39;targetPort&#39;</span><span class="p">:</span> <span class="n">port</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">],</span>
+                <span class="s1">&#39;selector&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;run&#39;</span><span class="p">:</span> <span class="n">pod_name</span>
+                <span class="p">}</span>
+            <span class="p">},</span> <span class="s1">&#39;status&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;loadBalancer&#39;</span><span class="p">:</span> <span class="p">{}}</span>
+        <span class="p">}</span>
+
+        <span class="n">oc</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span><span class="n">api_type</span><span class="o">=</span><span class="s1">&#39;kubeapi&#39;</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">project_name</span><span class="p">,</span> <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;services&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">svc_data</span><span class="p">)</span>
+
+        <span class="n">route_host</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">-</span><span class="si">%s</span><span class="s1">.</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pod_name</span><span class="p">,</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span><span class="p">[:</span><span class="mi">10</span><span class="p">],</span> <span class="n">oc</span><span class="o">.</span><span class="n">subdomain</span><span class="p">)</span>
+
+        <span class="c1"># https://server:8443/oapi/v1/namespaces/project/routes</span>
+        <span class="n">route_data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;kind&#39;</span><span class="p">:</span> <span class="s1">&#39;Route&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;apiVersion&#39;</span><span class="p">:</span> <span class="s1">&#39;v1&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;metadata&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">pod_name</span><span class="p">,</span>
+                <span class="s1">&#39;labels&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;run&#39;</span><span class="p">:</span> <span class="n">pod_name</span>
+                <span class="p">}</span>
+            <span class="p">},</span>
+            <span class="s1">&#39;spec&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;host&#39;</span><span class="p">:</span> <span class="n">route_host</span><span class="p">,</span>
+                <span class="s1">&#39;to&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">pod_name</span><span class="p">,</span>
+                <span class="p">},</span>
+                <span class="s1">&#39;port&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;targetPort&#39;</span><span class="p">:</span> <span class="n">port</span><span class="p">,</span>
+                <span class="p">},</span>
+                <span class="s1">&#39;tls&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;termination&#39;</span><span class="p">:</span> <span class="s1">&#39;edge&#39;</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+
+        <span class="n">route_data</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span><span class="n">namespace</span><span class="o">=</span><span class="n">project_name</span><span class="p">,</span> <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;routes&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">route_data</span><span class="p">)</span>
+        <span class="n">route_json</span> <span class="o">=</span> <span class="n">route_data</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">route</span><span class="o">=</span><span class="s1">&#39;https://</span><span class="si">%s</span><span class="s1">/&#39;</span> <span class="o">%</span> <span class="n">route_json</span><span class="p">[</span><span class="s1">&#39;spec&#39;</span><span class="p">][</span><span class="s1">&#39;host&#39;</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">_wait_for_pod_creation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">oc</span><span class="p">,</span> <span class="n">project_name</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">pod_name</span><span class="p">):</span>
+        <span class="c1"># wait for pod to become ready</span>
+        <span class="n">end_ts</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">+</span> <span class="n">MAX_POD_SPAWN_WAIT_TIME_SEC</span>
+        <span class="k">while</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">end_ts</span><span class="p">:</span>
+            <span class="c1"># pods live in kubernetes API</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span>
+                <span class="n">api_type</span><span class="o">=</span><span class="s1">&#39;kubeapi&#39;</span><span class="p">,</span>
+                <span class="n">namespace</span><span class="o">=</span><span class="n">project_name</span><span class="p">,</span>
+                <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;pods&#39;</span><span class="p">,</span>
+                <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+                <span class="n">pod_ready</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">for</span> <span class="n">pod</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s1">&#39;items&#39;</span><span class="p">]:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">pod_status</span> <span class="o">=</span> <span class="n">pod</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">][</span><span class="s1">&#39;phase&#39;</span><span class="p">]</span>
+                        <span class="k">if</span> <span class="n">pod_status</span> <span class="o">!=</span> <span class="s1">&#39;Running&#39;</span><span class="p">:</span>
+                            <span class="k">break</span>
+                        <span class="n">pod_ready</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">except</span><span class="p">:</span>
+                        <span class="k">pass</span>
+
+                <span class="k">if</span> <span class="n">pod_ready</span><span class="p">:</span>
+                    <span class="k">break</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;waiting for pod to be ready </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">pod_name</span><span class="p">)</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;Timeout waiting for pod readiness for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;labelSelector&#39;</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">do_deprovision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_deprovision</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_do_deprovision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Deprovisions an instance. It removes</span>
+<span class="sd">        - DeploymentConfig (DC)</span>
+<span class="sd">        - ReplicationController (RC)</span>
+<span class="sd">        - Service</span>
+<span class="sd">        - Route</span>
+
+<span class="sd">        DC is removed first, then RC is scaled down to get rid of Pods. When the Pods are gone, RC is removed.</span>
+<span class="sd">        Then Service and Route are removed.</span>
+
+<span class="sd">        Any volumes attached to the instance are left intact, as well as the project the instance is running in.</span>
+
+<span class="sd">        :param token: token to access API</span>
+<span class="sd">        :param instance_id: the instance to delete</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;do_deprovision </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">instance_id</span><span class="p">)</span>
+
+        <span class="n">ap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_access_proxy</span><span class="p">()</span>
+
+        <span class="n">pbclient</span> <span class="o">=</span> <span class="n">ap</span><span class="o">.</span><span class="n">get_pb_client</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;INTERNAL_API_BASE_URL&#39;</span><span class="p">],</span> <span class="n">ssl_verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_instance_description</span><span class="p">(</span><span class="n">instance_id</span><span class="p">)</span>
+        <span class="n">log_uploader</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_prov_log_uploader</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">,</span> <span class="n">log_type</span><span class="o">=</span><span class="s1">&#39;deprovisioning&#39;</span><span class="p">)</span>
+
+        <span class="n">log_uploader</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Deprovisioning OpenShift based instance (</span><span class="si">%s</span><span class="s1">)</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">instance_id</span><span class="p">)</span>
+
+        <span class="c1"># fetch config</span>
+        <span class="n">blueprint</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_blueprint_description</span><span class="p">(</span><span class="n">instance</span><span class="p">[</span><span class="s1">&#39;blueprint_id&#39;</span><span class="p">])</span>
+        <span class="n">blueprint_config</span> <span class="o">=</span> <span class="n">blueprint</span><span class="p">[</span><span class="s1">&#39;full_config&#39;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s1">&#39;auto_authentication&#39;</span> <span class="ow">in</span> <span class="n">blueprint_config</span> <span class="ow">and</span> <span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;auto_authentication&#39;</span><span class="p">]:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">pbclient</span><span class="o">.</span><span class="n">instance_token_delete</span><span class="p">(</span><span class="n">instance_id</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;the token seems to be not present or deleted already&quot;</span><span class="p">)</span>
+
+        <span class="n">oc</span> <span class="o">=</span> <span class="n">ap</span><span class="o">.</span><span class="n">get_openshift_client</span><span class="p">(</span>
+            <span class="n">cluster_id</span><span class="o">=</span><span class="n">blueprint_config</span><span class="p">[</span><span class="s1">&#39;openshift_cluster_id&#39;</span><span class="p">],</span>
+        <span class="p">)</span>
+
+        <span class="n">project</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_project_name</span><span class="p">(</span><span class="n">instance</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_delete_objects</span><span class="p">(</span><span class="n">oc</span><span class="o">=</span><span class="n">oc</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="n">project</span><span class="p">,</span> <span class="n">blueprint_config</span><span class="o">=</span><span class="n">blueprint_config</span><span class="p">,</span> <span class="n">instance</span><span class="o">=</span><span class="n">instance</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_delete_objects</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">oc</span><span class="p">,</span> <span class="n">project</span><span class="p">,</span> <span class="n">instance</span><span class="p">,</span> <span class="n">blueprint_config</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Delete openshift objects</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+        <span class="n">instance_id</span> <span class="o">=</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span>
+
+        <span class="c1"># remove dc</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_delete_request</span><span class="p">(</span>
+            <span class="n">namespace</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
+            <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;deploymentconfigs&#39;</span><span class="p">,</span>
+            <span class="n">object_id</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">raise_on_failure</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">res</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">404</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;do_deprovision: DC not found, assuming deleted: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
+
+        <span class="c1"># find rc</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">labelSelector</span><span class="o">=</span><span class="s1">&#39;run=</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+        <span class="n">rc_list</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">search_by_label</span><span class="p">(</span>
+            <span class="n">api_type</span><span class="o">=</span><span class="s1">&#39;kubeapi&#39;</span><span class="p">,</span>
+            <span class="n">namespace</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
+            <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;replicationcontrollers&#39;</span><span class="p">,</span>
+            <span class="n">params</span><span class="o">=</span><span class="n">params</span>
+        <span class="p">)</span>
+        <span class="c1"># then set replicas to 0 and let pods die</span>
+        <span class="k">for</span> <span class="n">rc</span> <span class="ow">in</span> <span class="n">rc_list</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scale_rc</span><span class="p">(</span><span class="n">oc</span><span class="p">,</span> <span class="n">project</span><span class="p">,</span> <span class="n">rc</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="c1"># remove rc</span>
+        <span class="k">for</span> <span class="n">rc</span> <span class="ow">in</span> <span class="n">rc_list</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_delete_request</span><span class="p">(</span>
+                <span class="n">api_type</span><span class="o">=</span><span class="s1">&#39;kubeapi&#39;</span><span class="p">,</span>
+                <span class="n">namespace</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
+                <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;replicationcontrollers&#39;</span><span class="p">,</span>
+                <span class="n">object_id</span><span class="o">=</span><span class="n">rc</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+                <span class="n">raise_on_failure</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">res</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">404</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;do_deprovision: RC not found, assuming deleted: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
+
+        <span class="c1"># remove route</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_delete_request</span><span class="p">(</span>
+            <span class="n">namespace</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
+            <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;routes&#39;</span><span class="p">,</span>
+            <span class="n">object_id</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">raise_on_failure</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">res</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">404</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;do_deprovision: route not found, assuming deleted: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
+
+        <span class="c1"># remove service</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_delete_request</span><span class="p">(</span>
+            <span class="n">api_type</span><span class="o">=</span><span class="s1">&#39;kubeapi&#39;</span><span class="p">,</span>
+            <span class="n">namespace</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
+            <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;services&#39;</span><span class="p">,</span>
+            <span class="n">object_id</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">raise_on_failure</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">res</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">404</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;do_deprovision: service not found, assuming deleted: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;do_deprovision done for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">instance_id</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_scale_rc</span><span class="p">(</span><span class="n">oc</span><span class="p">,</span> <span class="n">project</span><span class="p">,</span> <span class="n">rc</span><span class="p">,</span> <span class="n">num_replicas</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Scale a ReplicationController and wait for the amount of replicas to catch up. The maximum waiting time</span>
+<span class="sd">        is taken from MAX_POD_SCALE_WAIT_TIME_SEC</span>
+
+<span class="sd">        :param oc: the openshift client to use</span>
+<span class="sd">        :param project: project name</span>
+<span class="sd">        :param rc: ReplicationController name</span>
+<span class="sd">        :param num_replicas: new number of replicas</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># scale the pods down</span>
+        <span class="n">rc</span><span class="p">[</span><span class="s1">&#39;spec&#39;</span><span class="p">][</span><span class="s1">&#39;replicas&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">num_replicas</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span>
+            <span class="n">api_type</span><span class="o">=</span><span class="s1">&#39;kubeapi&#39;</span><span class="p">,</span>
+            <span class="n">method</span><span class="o">=</span><span class="s1">&#39;PUT&#39;</span><span class="p">,</span>
+            <span class="n">namespace</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
+            <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;replicationcontrollers&#39;</span><span class="p">,</span>
+            <span class="n">object_id</span><span class="o">=</span><span class="n">rc</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">rc</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">res</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
+
+        <span class="c1"># wait for scaling to be complete</span>
+        <span class="n">end_ts</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">+</span> <span class="n">MAX_POD_SCALE_WAIT_TIME_SEC</span>
+        <span class="k">while</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">end_ts</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">oc</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span>
+                <span class="n">api_type</span><span class="o">=</span><span class="s1">&#39;kubeapi&#39;</span><span class="p">,</span>
+                <span class="n">namespace</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
+                <span class="n">object_kind</span><span class="o">=</span><span class="s1">&#39;replicationcontrollers&#39;</span><span class="p">,</span>
+                <span class="n">object_id</span><span class="o">=</span><span class="n">rc</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="n">rc</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">rc</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">][</span><span class="s1">&#39;replicas&#39;</span><span class="p">])</span> <span class="o">==</span> <span class="n">num_replicas</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;Could not scale pods to </span><span class="si">%d</span><span class="s1"> for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">num_replicas</span><span class="p">,</span> <span class="n">rc</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">]))</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_get_project_name</span><span class="p">(</span><span class="n">instance</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate a project name from instance data. If the instance data already has &#39;project_name&#39; attribute,</span>
+<span class="sd">        use that.</span>
+
+<span class="sd">        :param instance: dict containing instance data</span>
+<span class="sd">        :return: project name based on username and first 4 characters of user id</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="s1">&#39;instance_data&#39;</span> <span class="ow">in</span> <span class="n">instance</span> <span class="ow">and</span> <span class="s1">&#39;project_name&#39;</span> <span class="ow">in</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;instance_data&#39;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;instance_data&#39;</span><span class="p">][</span><span class="s1">&#39;project_name&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># create a project name based on username and userid</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1">-</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">instance</span><span class="p">[</span><span class="s1">&#39;username&#39;</span><span class="p">],</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;user_id&#39;</span><span class="p">][:</span><span class="mi">4</span><span class="p">]))</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">,</span> <span class="s1">&#39;-at-&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">name</span>
+
+    <span class="k">def</span> <span class="nf">do_housekeep</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">):</span>
+        <span class="c1"># TODO: Implement optional cleaning of the old projects.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;do_housekeep not implemented&#39;</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

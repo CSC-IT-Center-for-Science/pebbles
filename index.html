@@ -1,0 +1,236 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Welcome to Pebbles’s documentation! &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="welcome-to-pebbles-s-documentation">
+<h1>Welcome to Pebbles&#8217;s documentation!<a class="headerlink" href="#welcome-to-pebbles-s-documentation" title="Permalink to this headline">¶</a></h1>
+<p>Pebbles is a tool developed at <a class="reference external" href="http://www.csc.fi/">CSC</a> for simple provisioning of resources.
+<a class="reference external" href="https://github.com/CSCfi/pebbles/">Pebbles</a> is the name of the open source project and the installations should
+individual names. The name of the installation at CSC for example will be
+called CSC Notebooks.</p>
+<span class="target" id="module-pebbles"></span><div class="section" id="pebbles-overview">
+<h2>Pebbles overview<a class="headerlink" href="#pebbles-overview" title="Permalink to this headline">¶</a></h2>
+<p>Pebbles is about provisioning cloud resources with a simple end-user
+experience. Currently supported provisioning back-end is OpenStack. It&#8217;s
+possible to provision either full Virtual Machines or merely Docker containers
+from a pool of hosts that Pebbles maintains.</p>
+<p>Virtual machines can and typically do have their own IP address and for
+containers a port can be forwarded for communication with software running on
+the container.  Jupyter Notebooks or RStudio Server are good candidates for
+inside a container.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Currently no authentication is done when accessing a container via a
+forwarded URL.  Anyone who knows the URL for a notebook can access it, the
+connection is not authenticated.  This is something to keep in mind as it has
+security implications. Scanning for all possible URLs may be difficult but in
+the current implementation confidentiality of data in notebooks is not
+guaranteed.  The upside is that many parties can access the same container
+if the URL is shared.</p>
+</div>
+<dl class="docutils">
+<dt>The resources are abstracted on two levels as Bluperint Templates and Blueprints:</dt>
+<dd><ul class="first last simple">
+<li><strong>Blueprint templates</strong> are created by system administrators who maintain the
+system.</li>
+<li><strong>Blueprints</strong> can be created based on an existing Blueprint templates by
+users with elevated but non-administrator rights. Regular users can then
+provision and access resources based on these blueprints.</li>
+</ul>
+</dd>
+</dl>
+<p>The purpose of this divide is to let system administrators create types of
+resource packages with limited freedom to modify the parameters delegated to
+lower level elevated priviledge users.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">All disk storage in Pebbles is more or less ephemeral. You are
+responsible for your data persistence!</p>
+</div>
+<div class="section" id="user-types-in-pebbles">
+<h3>User Types in Pebbles<a class="headerlink" href="#user-types-in-pebbles" title="Permalink to this headline">¶</a></h3>
+<p>There are broadly four roles in a Pebbles instance:</p>
+<ol class="arabic simple">
+<li><dl class="first docutils">
+<dt>Admin - Which is supposed to be the superuser of the system. Ability to</dt>
+<dd>invite new users, appoint group owners, create blueprint templates,
+blueprints, system and normal groups. System level priviledges : Access to
+the backend database, restart or delete running services.</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Group Owner - Ability to create groups, appoint group managers , create</dt>
+<dd>blueprints and manage instances running in a group</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Group Manager - Ability to create blueprints and manage instances</dt>
+<dd>running in a group</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>User - Able to launch instances if belonging to a group with</dt>
+<dd>blueprints.</dd>
+</dl>
+</li>
+</ol>
+<p>A <strong>group owner</strong> is typically associated with costs tracking, e.g. a
+professor or researcher. The group owner can create groups and promote other
+users to be <strong>group managers</strong> to run basic day-to-day tasks.</p>
+</div>
+<div class="section" id="use-cases">
+<h3>Use Cases<a class="headerlink" href="#use-cases" title="Permalink to this headline">¶</a></h3>
+<p>The current main use cases revolve around setting up simple environments for
+teaching and/or ad-hoc data analysis.</p>
+<div class="section" id="notebooks-in-containers">
+<h4>Notebooks in containers<a class="headerlink" href="#notebooks-in-containers" title="Permalink to this headline">¶</a></h4>
+<p>See <a class="reference external" href="https://pb.csc.fi/">pb</a> for a live example.</p>
+<ol class="arabic simple">
+<li>User navigates to page</li>
+<li>User logs in with SSO they already know</li>
+<li>User selects appropriate blueprint and clicks a button</li>
+<li>System provisions a Docker container from an image</li>
+<li>System starts Jupyter/RStudio/similar inside container and forwards a port</li>
+<li>User can access the HTML UI from his own browser</li>
+</ol>
+</div>
+<div class="section" id="virtual-machines-in-the-cloud">
+<h4>Virtual machines in the cloud.<a class="headerlink" href="#virtual-machines-in-the-cloud" title="Permalink to this headline">¶</a></h4>
+<ol class="arabic simple">
+<li>User navigates to page</li>
+<li>User logs in with SSO they already know</li>
+<li>User selects appropriate blueprint and clicks a button</li>
+<li>System provisions a virtual machine from <a class="reference external" href="https://research.csc.fi/cpouta">cPouta</a> using a provided base image</li>
+<li>User can remote desktop into the IP address of the remote instance</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="section" id="group-owner-documentation">
+<h2>Group owner documentation<a class="headerlink" href="#group-owner-documentation" title="Permalink to this headline">¶</a></h2>
+<p>Documentation relevant to group owners and managers is gathered under
+<a class="reference internal" href="group_owners_guide.html"><span class="doc">Group Owner&#8217;s Guide</span></a></p>
+</div>
+<div class="section" id="administrators-and-developers">
+<h2>Administrators and Developers<a class="headerlink" href="#administrators-and-developers" title="Permalink to this headline">¶</a></h2>
+<p>Documentation relevant to system administrators and developers is under
+<a class="reference internal" href="admin_guide.html"><span class="doc">Admin guide</span></a></p>
+</div>
+<div class="section" id="indices-and-tables">
+<h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></li>
+<li><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></li>
+<li><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Welcome to Pebbles&#8217;s documentation!</a><ul>
+<li><a class="reference internal" href="#pebbles-overview">Pebbles overview</a><ul>
+<li><a class="reference internal" href="#user-types-in-pebbles">User Types in Pebbles</a></li>
+<li><a class="reference internal" href="#use-cases">Use Cases</a><ul>
+<li><a class="reference internal" href="#notebooks-in-containers">Notebooks in containers</a></li>
+<li><a class="reference internal" href="#virtual-machines-in-the-cloud">Virtual machines in the cloud.</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#group-owner-documentation">Group owner documentation</a></li>
+<li><a class="reference internal" href="#administrators-and-developers">Administrators and Developers</a></li>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

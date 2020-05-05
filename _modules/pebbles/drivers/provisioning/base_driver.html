@@ -1,0 +1,299 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>pebbles.drivers.provisioning.base_driver &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="../../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../../',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for pebbles.drivers.provisioning.base_driver</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Drivers abstract resource provisioning strategies to the system and user.</span>
+
+<span class="sd">A driver object can be instantiated to connect to some end point to CRUD</span>
+<span class="sd">resources like Docker containers or OpenStack virtual machines.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">import</span> <span class="nn">abc</span>
+<span class="kn">import</span> <span class="nn">six</span>
+
+<span class="kn">from</span> <span class="nn">pebbles.logger</span> <span class="k">import</span> <span class="n">PBInstanceLogHandler</span><span class="p">,</span> <span class="n">PBInstanceLogFormatter</span>
+<span class="kn">from</span> <span class="nn">pebbles.client</span> <span class="k">import</span> <span class="n">PBClient</span>
+<span class="kn">from</span> <span class="nn">pebbles.models</span> <span class="k">import</span> <span class="n">Instance</span>
+
+
+<span class="nd">@six</span><span class="o">.</span><span class="n">add_metaclass</span><span class="p">(</span><span class="n">abc</span><span class="o">.</span><span class="n">ABCMeta</span><span class="p">)</span>
+<div class="viewcode-block" id="ProvisioningDriverBase"><a class="viewcode-back" href="../../../../drivers.html#pebbles.drivers.provisioning.base_driver.ProvisioningDriverBase">[docs]</a><span class="k">class</span> <span class="nc">ProvisioningDriverBase</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; This class functions as the base for other classes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logger</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_m2m_credentials</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">get_m2m_credentials</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Helper to read and parse m2m credentials. The file name</span>
+<span class="sd">          is taken from M2M_CREDENTIAL_STORE config key.</span>
+
+<span class="sd">        :return: a dict parsed from creds file</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_m2m_credentials&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;m2m creds: found cached m2m creds&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_m2m_credentials</span>
+
+        <span class="n">m2m_credential_store</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;M2M_CREDENTIAL_STORE&#39;</span><span class="p">]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_m2m_credentials</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">m2m_credential_store</span><span class="p">))</span>
+
+            <span class="n">debug_str</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;m2m_creds:&#39;</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_m2m_credentials</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s1">&#39;OS_PASSWORD&#39;</span><span class="p">:</span>
+                    <span class="n">debug_str</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;OS_PASSWORD is set (not shown)&#39;</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;OS_USERNAME&#39;</span><span class="p">,</span> <span class="s1">&#39;OS_TENANT_NAME&#39;</span><span class="p">,</span> <span class="s1">&#39;OS_TENANT_ID&#39;</span><span class="p">,</span> <span class="s1">&#39;OS_AUTH_URL&#39;</span><span class="p">):</span>
+                    <span class="n">debug_str</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1">: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_m2m_credentials</span><span class="p">[</span><span class="n">key</span><span class="p">]))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">debug_str</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;other key </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">key</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">debug_str</span><span class="p">))</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">IOError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Unable to parse M2M credentials from path </span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">m2m_credential_store</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_m2m_credentials</span>
+
+    <span class="k">def</span> <span class="nf">get_configuration</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;schema&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;object&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;properties&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;string&#39;</span>
+                    <span class="p">}</span>
+                <span class="p">},</span>
+            <span class="p">},</span>
+            <span class="s1">&#39;form&#39;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span><span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;help&#39;</span><span class="p">,</span> <span class="s1">&#39;helpvalue&#39;</span><span class="p">:</span> <span class="s1">&#39;config is empty&#39;</span><span class="p">},</span>
+                <span class="s1">&#39;*&#39;</span><span class="p">,</span>
+                <span class="p">{</span><span class="s1">&#39;style&#39;</span><span class="p">:</span> <span class="s1">&#39;btn-info&#39;</span><span class="p">,</span> <span class="s1">&#39;title&#39;</span><span class="p">:</span> <span class="s1">&#39;Create&#39;</span><span class="p">,</span> <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;submit&#39;</span><span class="p">}</span>
+            <span class="p">],</span> <span class="s1">&#39;model&#39;</span><span class="p">:</span> <span class="p">{}}</span>
+
+    <span class="k">def</span> <span class="nf">get_backend_configuration</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; This method would return the default values of the backend vars</span>
+<span class="sd">            which are specific to a particular driver.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; an update call  updates the status of an instance.</span>
+
+<span class="sd">        If an instance is queued it will be provisioned, if should be deleted,</span>
+<span class="sd">        it is.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;update(&#39;</span><span class="si">%s</span><span class="s2">&#39;)&quot;</span> <span class="o">%</span> <span class="n">instance_id</span><span class="p">)</span>
+
+        <span class="n">pbclient</span> <span class="o">=</span> <span class="n">PBClient</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;INTERNAL_API_BASE_URL&#39;</span><span class="p">],</span> <span class="n">ssl_verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="n">pbclient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">instance_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;to_be_deleted&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="n">Instance</span><span class="o">.</span><span class="n">STATE_QUEUEING</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">provision</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;to_be_deleted&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="n">Instance</span><span class="o">.</span><span class="n">STATE_DELETED</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">deprovision</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">)</span>
+            <span class="n">pbclient</span><span class="o">.</span><span class="n">clear_running_instance_logs</span><span class="p">(</span><span class="n">instance_id</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;update(&#39;</span><span class="si">%s</span><span class="s2">&#39;) - nothing to do for </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="n">instance</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">update_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;update connectivity&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">do_update_connectivity</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">provision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;starting provisioning&#39;</span><span class="p">)</span>
+        <span class="n">pbclient</span> <span class="o">=</span> <span class="n">PBClient</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;INTERNAL_API_BASE_URL&#39;</span><span class="p">],</span> <span class="n">ssl_verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">pbclient</span><span class="o">.</span><span class="n">do_instance_patch</span><span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="n">Instance</span><span class="o">.</span><span class="n">STATE_PROVISIONING</span><span class="p">})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;calling subclass do_provision&#39;</span><span class="p">)</span>
+
+            <span class="n">new_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_provision</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">new_state</span><span class="p">:</span>
+                <span class="n">new_state</span> <span class="o">=</span> <span class="n">Instance</span><span class="o">.</span><span class="n">STATE_RUNNING</span>
+
+            <span class="n">pbclient</span><span class="o">.</span><span class="n">do_instance_patch</span><span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="n">new_state</span><span class="p">})</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s1">&#39;do_provision raised </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+            <span class="n">pbclient</span><span class="o">.</span><span class="n">do_instance_patch</span><span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="n">Instance</span><span class="o">.</span><span class="n">STATE_FAILED</span><span class="p">})</span>
+            <span class="k">raise</span> <span class="n">e</span>
+
+    <span class="k">def</span> <span class="nf">deprovision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;starting deprovisioning&#39;</span><span class="p">)</span>
+        <span class="n">pbclient</span> <span class="o">=</span> <span class="n">PBClient</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;INTERNAL_API_BASE_URL&#39;</span><span class="p">],</span> <span class="n">ssl_verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">pbclient</span><span class="o">.</span><span class="n">do_instance_patch</span><span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="n">Instance</span><span class="o">.</span><span class="n">STATE_DELETING</span><span class="p">})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;calling subclass do_deprovision&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">do_deprovision</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;finishing deprovisioning&#39;</span><span class="p">)</span>
+            <span class="n">pbclient</span><span class="o">.</span><span class="n">do_instance_patch</span><span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;deprovisioned_at&#39;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()})</span>
+            <span class="n">pbclient</span><span class="o">.</span><span class="n">do_instance_patch</span><span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="n">Instance</span><span class="o">.</span><span class="n">STATE_DELETED</span><span class="p">})</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s1">&#39;do_deprovision raised </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+            <span class="n">pbclient</span><span class="o">.</span><span class="n">do_instance_patch</span><span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="n">Instance</span><span class="o">.</span><span class="n">STATE_FAILED</span><span class="p">})</span>
+            <span class="k">raise</span> <span class="n">e</span>
+
+    <span class="k">def</span> <span class="nf">housekeep</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; called periodically to do housekeeping tasks.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;housekeep&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">do_housekeep</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">do_housekeep</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Each plugin must implement this method but it doesn&#39;t have to do</span>
+<span class="sd">        anything. Can be used to e.g. determine that a system should scale up</span>
+<span class="sd">        or down.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">do_update_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Each plugin must implement this method but it doesn&#39;t have to do</span>
+<span class="sd">        anything.</span>
+
+<span class="sd">        This can be used to e.g. open holes in firewalls or to update a proxy</span>
+<span class="sd">        to route traffic to an instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">get_running_instance_logs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; get the logs of an instance which is in running state &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">do_provision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; The steps to take to provision an instance.</span>
+<span class="sd">        Probably doesn&#39;t make sense not to implement.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">pass</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">do_deprovision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; The steps to take to deprovision an instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">create_prov_log_uploader</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">instance_id</span><span class="p">,</span> <span class="n">log_type</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Creates a new logger that will upload the log file via the</span>
+<span class="sd">        internal API.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">uploader</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1">-</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">instance_id</span><span class="p">,</span> <span class="n">log_type</span><span class="p">))</span>
+        <span class="n">uploader</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">handler</span> <span class="ow">in</span> <span class="n">uploader</span><span class="o">.</span><span class="n">handlers</span><span class="p">:</span>
+            <span class="n">uploader</span><span class="o">.</span><span class="n">removeHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s1">&#39;TEST_MODE&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">:</span>
+            <span class="c1"># check if the custom handler is already there</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">uploader</span><span class="o">.</span><span class="n">handlers</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">log_handler</span> <span class="o">=</span> <span class="n">PBInstanceLogHandler</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;INTERNAL_API_BASE_URL&#39;</span><span class="p">],</span>
+                    <span class="n">instance_id</span><span class="p">,</span>
+                    <span class="n">token</span><span class="p">,</span>
+                    <span class="n">ssl_verify</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;SSL_VERIFY&#39;</span><span class="p">])</span>
+                <span class="n">formatter</span> <span class="o">=</span> <span class="n">PBInstanceLogFormatter</span><span class="p">(</span><span class="n">log_type</span><span class="p">)</span>
+                <span class="n">log_handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">formatter</span><span class="p">)</span>
+                <span class="n">uploader</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">log_handler</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">uploader</span>
+
+    <span class="k">def</span> <span class="nf">create_openstack_env</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">m2m_creds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_m2m_credentials</span><span class="p">()</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;OS_USERNAME&#39;</span><span class="p">,</span> <span class="s1">&#39;OS_PASSWORD&#39;</span><span class="p">,</span> <span class="s1">&#39;OS_TENANT_NAME&#39;</span><span class="p">,</span> <span class="s1">&#39;OS_TENANT_ID&#39;</span><span class="p">,</span> <span class="s1">&#39;OS_AUTH_URL&#39;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">m2m_creds</span><span class="p">:</span>
+                <span class="n">env</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">m2m_creds</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="n">env</span><span class="p">[</span><span class="s1">&#39;PYTHONUNBUFFERED&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;1&#39;</span>
+        <span class="n">env</span><span class="p">[</span><span class="s1">&#39;ANSIBLE_HOST_KEY_CHECKING&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;0&#39;</span>
+        <span class="k">return</span> <span class="n">env</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

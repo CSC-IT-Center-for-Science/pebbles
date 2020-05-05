@@ -1,0 +1,173 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Configurations &#8212; pebbles 4.0.0.dev1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '4.0.0.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="module-pebbles.config">
+<span id="configurations"></span><h1>Configurations<a class="headerlink" href="#module-pebbles.config" title="Permalink to this headline">¶</a></h1>
+<p>Pebbles is configured with a number of <strong>variables</strong>.</p>
+<p>These variables come, in the order of precedence from</p>
+<ul class="simple">
+<li>environment variables</li>
+<li>a configuration file</li>
+<li>built-in defaults</li>
+</ul>
+<p>Naming convention is <cite>UPPERCASE_WORDS_WITH_UNDERSCORES</cite>.</p>
+<p>To see the complete list check out pebbles.config that houses the object.
+Only some have been documented.</p>
+<p>The idea is that you could have a single docker container with multiple
+entry points. All containers can (or should) see the same configuration file
+and then at start-up time environment variables can be set to e.g.
+differentiate workers to run a particular driver.</p>
+<div class="section" id="baseconfig">
+<h2>BaseConfig<a class="headerlink" href="#baseconfig" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="pebbles.config.BaseConfig">
+<em class="property">class </em><code class="descclassname">pebbles.config.</code><code class="descname">BaseConfig</code><a class="reference internal" href="_modules/pebbles/config.html#BaseConfig"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pebbles.config.BaseConfig" title="Permalink to this definition">¶</a></dt>
+<dd><p>Stores the default key, value pairs for the system configuration.
+Rendered with a decorator which considers any environment variables,
+then the system level config file and finally the default values,
+in that order of precedence.</p>
+<dl class="attribute">
+<dt id="pebbles.config.BaseConfig.BRAND_IMAGE">
+<code class="descname">BRAND_IMAGE</code><a class="headerlink" href="#pebbles.config.BaseConfig.BRAND_IMAGE" title="Permalink to this definition">¶</a></dt>
+<dd><p>An image URL for branding the installation</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pebbles.config.BaseConfig.DEBUG">
+<code class="descname">DEBUG</code><a class="headerlink" href="#pebbles.config.BaseConfig.DEBUG" title="Permalink to this definition">¶</a></dt>
+<dd><p>Controls debug mode</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pebbles.config.BaseConfig.HAKA_INSTITUTION_LIST">
+<code class="descname">HAKA_INSTITUTION_LIST</code><a class="headerlink" href="#pebbles.config.BaseConfig.HAKA_INSTITUTION_LIST" title="Permalink to this definition">¶</a></dt>
+<dd><p>Dictionary of institution types and corresponding domains</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pebbles.config.BaseConfig.INSTANCE_NAME_PREFIX">
+<code class="descname">INSTANCE_NAME_PREFIX</code><a class="headerlink" href="#pebbles.config.BaseConfig.INSTANCE_NAME_PREFIX" title="Permalink to this definition">¶</a></dt>
+<dd><p>all spawned instance names will have this prefix</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pebbles.config.BaseConfig.M2M_CREDENTIAL_STORE">
+<code class="descname">M2M_CREDENTIAL_STORE</code><a class="headerlink" href="#pebbles.config.BaseConfig.M2M_CREDENTIAL_STORE" title="Permalink to this definition">¶</a></dt>
+<dd><p>Where to find the M2M credentials file</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pebbles.config.BaseConfig.PLUGIN_WHITELIST">
+<code class="descname">PLUGIN_WHITELIST</code><a class="headerlink" href="#pebbles.config.BaseConfig.PLUGIN_WHITELIST" title="Permalink to this definition">¶</a></dt>
+<dd><p>A whitespace-separated case-sensitive list of all enabled plugins</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pebbles.config.BaseConfig.PUBLIC_IPV4">
+<code class="descname">PUBLIC_IPV4</code><a class="headerlink" href="#pebbles.config.BaseConfig.PUBLIC_IPV4" title="Permalink to this definition">¶</a></dt>
+<dd><p>used by Docker Driver to create access urls so FQDN is actually expected in production</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Configurations</a><ul>
+<li><a class="reference internal" href="#baseconfig">BaseConfig</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/configuring.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, CSC - Center for Scientific Computing Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/configuring.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
